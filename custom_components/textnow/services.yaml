@@ -4,16 +4,21 @@ send:
   fields:
     phone:
       name: Phone Number
-      description: Phone number to send message to (E.164 format recommended).
+      description: Phone number to send message to (auto-filled if contact is selected).
       example: "+1234567890"
       selector:
         text:
     contact_id:
-      name: Contact ID
-      description: Contact ID to send message to.
+      name: Contact
+      description: Select a contact to send message to (phone number will be auto-filled).
       example: "contact_1"
       selector:
-        text:
+        entity:
+          domain: sensor
+          device_class: ""
+          filter:
+            - domain: sensor
+              integration: textnow
     message:
       name: Message
       description: Message text to send.
@@ -24,20 +29,25 @@ send:
 
 prompt:
   name: Prompt
-  description: Send a prompt message and wait for a reply. The reply will be parsed and a textnow_reply_parsed event will be fired.
+  description: Send a prompt message with choices and wait for a reply. The reply will be parsed and a textnow_reply_parsed event will be fired.
   fields:
     phone:
       name: Phone Number
-      description: Phone number to send prompt to.
+      description: Phone number to send prompt to (auto-filled if contact_id is selected).
       example: "+1234567890"
       selector:
         text:
     contact_id:
-      name: Contact ID
-      description: Contact ID to send prompt to.
+      name: Contact
+      description: Select a contact to send prompt to (phone number will be auto-filled).
       example: "contact_1"
       selector:
-        text:
+        entity:
+          domain: sensor
+          device_class: ""
+          filter:
+            - domain: sensor
+              integration: textnow
     key:
       name: Key
       description: Unique key to identify this prompt. Used in reply_parsed event.
@@ -47,23 +57,11 @@ prompt:
         text:
     prompt:
       name: Prompt Text
-      description: The prompt message to send.
+      description: The prompt message to send (options will be numbered automatically).
       required: true
       example: "Please choose an option"
       selector:
         text:
-    type:
-      name: Type
-      description: Type of expected reply.
-      required: true
-      default: "text"
-      selector:
-        select:
-          options:
-            - choice
-            - text
-            - number
-            - boolean
     ttl_seconds:
       name: TTL Seconds
       description: Time to live for pending expectation in seconds.
@@ -76,14 +74,9 @@ prompt:
           step: 1
     options:
       name: Options
-      description: For choice type, list of options (as list or newline-separated string).
+      description: List of options for the user to choose from (as list or newline-separated string). Required.
+      required: true
       example: "Option 1\nOption 2\nOption 3"
-      selector:
-        text:
-    regex:
-      name: Regex Pattern
-      description: Optional regex pattern to validate text type replies.
-      example: "^[A-Z]{3}$"
       selector:
         text:
     keep_pending:
@@ -99,16 +92,21 @@ clear_pending:
   fields:
     phone:
       name: Phone Number
-      description: Phone number to clear pending for.
+      description: Phone number to clear pending for (auto-filled if contact is selected).
       example: "+1234567890"
       selector:
         text:
     contact_id:
-      name: Contact ID
-      description: Contact ID to clear pending for.
+      name: Contact
+      description: Select a contact to clear pending for (phone number will be auto-filled).
       example: "contact_1"
       selector:
-        text:
+        entity:
+          domain: sensor
+          device_class: ""
+          filter:
+            - domain: sensor
+              integration: textnow
     key:
       name: Key
       description: Optional specific key to clear. If not provided, clears all pending for the phone.
@@ -122,16 +120,21 @@ set_context:
   fields:
     phone:
       name: Phone Number
-      description: Phone number to set context for.
+      description: Phone number to set context for (auto-filled if contact is selected).
       example: "+1234567890"
       selector:
         text:
     contact_id:
-      name: Contact ID
-      description: Contact ID to set context for.
+      name: Contact
+      description: Select a contact to set context for (phone number will be auto-filled).
       example: "contact_1"
       selector:
-        text:
+        entity:
+          domain: sensor
+          device_class: ""
+          filter:
+            - domain: sensor
+              integration: textnow
     data:
       name: Data
       description: Dictionary of context data to merge.

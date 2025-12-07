@@ -90,52 +90,52 @@ async def async_prompt_message(
 
     key = data.get("key", "")
     prompt = data.get("prompt", "")
-    prompt_type = data.get("type", "text")
     ttl_seconds = data.get("ttl_seconds", 300)
     options = data.get("options")
-    regex = data.get("regex")
     keep_pending = data.get("keep_pending", False)
 
     if not key or not prompt:
         _LOGGER.error("Key and prompt are required")
         return
 
-    # Process options
-    if options:
-        if isinstance(options, str):
-            # Split by newlines or commas
-            if "\n" in options:
-                options = [opt.strip() for opt in options.split("\n") if opt.strip()]
-            else:
-                options = [opt.strip() for opt in options.split(",") if opt.strip()]
-        elif not isinstance(options, list):
-            options = None
+    if not options:
+        _LOGGER.error("Options are required for prompt service")
+        return
 
-    # Build message for choice type
-    if prompt_type == "choice" and options:
-        message_lines = [prompt]
-        for idx, option in enumerate(options, 1):
-            message_lines.append(f"{idx}. {option}")
-        message = "\n".join(message_lines)
-    else:
-        message = prompt
+    # Process options - always use choice type
+    if isinstance(options, str):
+        # Split by newlines or commas
+        if "\n" in options:
+            options = [opt.strip() for opt in options.split("\n") if opt.strip()]
+        else:
+            options = [opt.strip() for opt in options.split(",") if opt.strip()]
+    elif not isinstance(options, list):
+        _LOGGER.error("Options must be a list or string")
+        return
+
+    if not options:
+        _LOGGER.error("At least one option is required")
+        return
+
+    # Build message with numbered choices
+    message_lines = [prompt]
+    for idx, option in enumerate(options, 1):
+        message_lines.append(f"{idx}. {option}")
+    message = "\n".join(message_lines)
 
     try:
         # Send the message
         await coordinator.send_message(phone, message)
 
-        # Store pending expectation
+        # Store pending expectation (always choice type)
         storage = TextNowStorage(hass, coordinator.entry.entry_id)
         pending_data = {
-            "type": prompt_type,
+            "type": "choice",
             "created_at": dt_util.utcnow().isoformat(),
             "ttl_seconds": ttl_seconds,
             "keep_pending": keep_pending,
+            "options": options,
         }
-        if options:
-            pending_data["options"] = options
-        if regex:
-            pending_data["regex"] = regex
 
         await storage.async_set_pending(phone, key, pending_data)
         _LOGGER.info("Sent prompt to %s with key %s", phone, key)
@@ -185,16 +185,38 @@ async def async_set_context(
 async def _resolve_phone(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> str | None:
-    """Resolve phone number from phone or contact_id."""
-    if "phone" in data:
+    """Resolve phone number from phone or contact_id (entity_id)."""
+    # Check if phone is directly provided
+    if "phone" in data and data["phone"]:
         return data["phone"]
 
-    if "contact_id" in data:
-        contact_id = data["contact_id"]
-        storage = TextNowStorage(hass, coordinator.entry.entry_id)
-        contacts = await storage.async_get_contacts()
-        if contact_id in contacts:
-            return contacts[contact_id]["phone"]
+    # Check if contact_id is provided (could be entity_id or contact_id)
+    contact_id = data.get("contact_id")
+    if not contact_id:
+        return None
+
+    # If it's an entity_id (sensor.textnow_*), extract contact_id
+    if contact_id.startswith("sensor.textnow_"):
+        contact_id = contact_id.replace("sensor.textnow_", "")
+
+    # Get phone from storage
+    storage = TextNowStorage(hass, coordinator.entry.entry_id)
+    contacts = await storage.async_get_contacts()
+    if contact_id in contacts:
+        phone = contacts[contact_id]["phone"]
+        # Auto-fill phone in data if not already set
+        if "phone" not in data or not data["phone"]:
+            data["phone"] = phone
+        return phone
+
+    # Try to get from entity state if it's an entity_id
+    if contact_id.startswith("sensor."):
+        state = hass.states.get(contact_id)
+        if state and state.attributes.get("phone"):
+            phone = state.attributes["phone"]
+            if "phone" not in data or not data["phone"]:
+                data["phone"] = phone
+            return phone
 
     return None
 
