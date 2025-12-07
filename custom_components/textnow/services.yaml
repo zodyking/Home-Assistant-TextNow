@@ -1,0 +1,142 @@
+send:
+  name: Send Message
+  description: Send an SMS message to a phone number or contact.
+  fields:
+    phone:
+      name: Phone Number
+      description: Phone number to send message to (E.164 format recommended).
+      example: "+1234567890"
+      selector:
+        text:
+    contact_id:
+      name: Contact ID
+      description: Contact ID to send message to.
+      example: "contact_1"
+      selector:
+        text:
+    message:
+      name: Message
+      description: Message text to send.
+      required: true
+      example: "Hello, this is a test message"
+      selector:
+        text:
+
+prompt:
+  name: Prompt
+  description: Send a prompt message and wait for a reply. The reply will be parsed and a textnow_reply_parsed event will be fired.
+  fields:
+    phone:
+      name: Phone Number
+      description: Phone number to send prompt to.
+      example: "+1234567890"
+      selector:
+        text:
+    contact_id:
+      name: Contact ID
+      description: Contact ID to send prompt to.
+      example: "contact_1"
+      selector:
+        text:
+    key:
+      name: Key
+      description: Unique key to identify this prompt. Used in reply_parsed event.
+      required: true
+      example: "user_choice"
+      selector:
+        text:
+    prompt:
+      name: Prompt Text
+      description: The prompt message to send.
+      required: true
+      example: "Please choose an option"
+      selector:
+        text:
+    type:
+      name: Type
+      description: Type of expected reply.
+      required: true
+      default: "text"
+      selector:
+        select:
+          options:
+            - choice
+            - text
+            - number
+            - boolean
+    ttl_seconds:
+      name: TTL Seconds
+      description: Time to live for pending expectation in seconds.
+      default: 300
+      example: 300
+      selector:
+        number:
+          min: 1
+          max: 86400
+          step: 1
+    options:
+      name: Options
+      description: For choice type, list of options (as list or newline-separated string).
+      example: "Option 1\nOption 2\nOption 3"
+      selector:
+        text:
+    regex:
+      name: Regex Pattern
+      description: Optional regex pattern to validate text type replies.
+      example: "^[A-Z]{3}$"
+      selector:
+        text:
+    keep_pending:
+      name: Keep Pending
+      description: If true, don't clear pending expectation after first match.
+      default: false
+      selector:
+        boolean:
+
+clear_pending:
+  name: Clear Pending
+  description: Clear pending expectations for a phone number or contact.
+  fields:
+    phone:
+      name: Phone Number
+      description: Phone number to clear pending for.
+      example: "+1234567890"
+      selector:
+        text:
+    contact_id:
+      name: Contact ID
+      description: Contact ID to clear pending for.
+      example: "contact_1"
+      selector:
+        text:
+    key:
+      name: Key
+      description: Optional specific key to clear. If not provided, clears all pending for the phone.
+      example: "user_choice"
+      selector:
+        text:
+
+set_context:
+  name: Set Context
+  description: Set or merge context data for a phone number or contact.
+  fields:
+    phone:
+      name: Phone Number
+      description: Phone number to set context for.
+      example: "+1234567890"
+      selector:
+        text:
+    contact_id:
+      name: Contact ID
+      description: Contact ID to set context for.
+      example: "contact_1"
+      selector:
+        text:
+    data:
+      name: Data
+      description: Dictionary of context data to merge.
+      required: true
+      example: '{"step": 1, "user_name": "John"}'
+      selector:
+        object:
+

@@ -1,0 +1,14 @@
+{
+  "domain": "textnow",
+  "name": "TextNow",
+  "codeowners": ["@zodyking"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/zodyking/Home-Assistant-TextNow",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/zodyking/Home-Assistant-TextNow/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
+

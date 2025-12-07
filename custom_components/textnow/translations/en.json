@@ -1,0 +1,71 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "TextNow Configuration",
+        "description": "Enter your TextNow account credentials",
+        "data": {
+          "username": "Username",
+          "connect_sid": "connect.sid Cookie",
+          "csrf": "_csrf Cookie",
+          "polling_interval": "Polling Interval (seconds)",
+          "allowed_phones": "Allowed Phone Numbers (comma-separated)"
+        }
+      },
+      "account": {
+        "title": "Account Settings",
+        "description": "Update your TextNow account settings"
+      },
+      "contacts": {
+        "title": "Manage Contacts",
+        "description": "Add, edit, or remove contacts"
+      },
+      "add_contact": {
+        "title": "Add Contact",
+        "description": "Add a new contact",
+        "data": {
+          "name": "Contact Name",
+          "phone": "Phone Number"
+        }
+      },
+      "edit_contact": {
+        "title": "Edit Contact",
+        "description": "Edit contact details",
+        "data": {
+          "name": "Contact Name",
+          "phone": "Phone Number"
+        }
+      }
+    },
+    "error": {
+      "username_required": "Username is required",
+      "connect_sid_required": "connect.sid cookie is required",
+      "csrf_required": "_csrf cookie is required",
+      "invalid_credentials": "Invalid credentials",
+      "cannot_connect": "Cannot connect to TextNow",
+      "unknown": "Unknown error occurred"
+    },
+    "abort": {
+      "already_configured": "TextNow is already configured"
+    }
+  },
+  "services": {
+    "send": {
+      "name": "Send Message",
+      "description": "Send an SMS message"
+    },
+    "prompt": {
+      "name": "Prompt",
+      "description": "Send a prompt and wait for reply"
+    },
+    "clear_pending": {
+      "name": "Clear Pending",
+      "description": "Clear pending expectations"
+    },
+    "set_context": {
+      "name": "Set Context",
+      "description": "Set context data for a contact"
+    }
+  }
+}
+

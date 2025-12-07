@@ -1,0 +1,41 @@
+# Home Assistant
+.homeassistant/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.py[cod]
+*$py.class
+*.log
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# HACS
+.hacs.json
+
