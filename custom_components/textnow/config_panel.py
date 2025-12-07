@@ -132,67 +132,6 @@ class TextNowPanelView(HomeAssistantView):
         from aiohttp import web
         return web.Response(text=html_content, content_type="text/html")
 
-    async def post(self, request):
-        """Update config panel data."""
-        hass = request.app["hass"]
-        data = await request.json()
-        entry_id = data.get("entry_id")
-        
-        if not entry_id:
-            return self.json({"error": "entry_id required"}, status_code=400)
-
-        config_entry = hass.config_entries.async_get_entry(entry_id)
-        if not config_entry:
-            return self.json({"error": "Config entry not found"}, status_code=404)
-
-        # Handle contact operations
-        action = data.get("action")
-        if action == "add_contact":
-            storage = TextNowStorage(hass, entry_id)
-            contact_id = data.get("contact_id")
-            name = data.get("name")
-            phone = data.get("phone")
-            
-            if contact_id and name and phone:
-                try:
-                    formatted_phone = format_phone_number(phone)
-                    await storage.async_save_contact(contact_id, name, formatted_phone)
-                    hass.bus.async_fire(
-                        f"{DOMAIN}_contact_added",
-                        {"contact_id": contact_id, "name": name, "phone": formatted_phone},
-                    )
-                    return self.json({"success": True})
-                except ValueError as e:
-                    return self.json({"error": str(e)}, status_code=400)
-        
-        elif action == "delete_contact":
-            storage = TextNowStorage(hass, entry_id)
-            contact_id = data.get("contact_id")
-            
-            if contact_id:
-                await storage.async_delete_contact(contact_id)
-                hass.bus.async_fire(
-                    f"{DOMAIN}_contact_deleted",
-                    {"contact_id": contact_id},
-                )
-                return self.json({"success": True})
-        
-        elif action == "update_contact":
-            storage = TextNowStorage(hass, entry_id)
-            contact_id = data.get("contact_id")
-            name = data.get("name")
-            phone = data.get("phone")
-            
-            if contact_id and name and phone:
-                try:
-                    formatted_phone = format_phone_number(phone)
-                    await storage.async_save_contact(contact_id, name, formatted_phone)
-                    return self.json({"success": True})
-                except ValueError as e:
-                    return self.json({"error": str(e)}, status_code=400)
-
-        return self.json({"error": "Invalid action"}, status_code=400)
-
 
 async def async_setup_config_panel(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the config panel."""
