@@ -58,9 +58,9 @@ async def async_send_message(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> None:
     """Handle send message service call."""
-    phone = await _resolve_phone(hass, coordinator, data)
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
     if not phone:
-        _LOGGER.error("Must provide either phone or contact_id")
+        _LOGGER.error("Must provide contact_id")
         return
 
     message = data.get("message", "")
@@ -83,9 +83,9 @@ async def async_prompt_message(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> None:
     """Handle prompt message service call."""
-    phone = await _resolve_phone(hass, coordinator, data)
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
     if not phone:
-        _LOGGER.error("Must provide either phone or contact_id")
+        _LOGGER.error("Must provide contact_id")
         return
 
     key = data.get("key", "")
@@ -151,9 +151,9 @@ async def async_clear_pending(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> None:
     """Handle clear pending service call."""
-    phone = await _resolve_phone(hass, coordinator, data)
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
     if not phone:
-        _LOGGER.error("Must provide either phone or contact_id")
+        _LOGGER.error("Must provide contact_id")
         return
 
     key = data.get("key")  # Optional
@@ -167,9 +167,9 @@ async def async_set_context(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> None:
     """Handle set context service call."""
-    phone = await _resolve_phone(hass, coordinator, data)
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
     if not phone:
-        _LOGGER.error("Must provide either phone or contact_id")
+        _LOGGER.error("Must provide contact_id")
         return
 
     context_data = data.get("data", {})
@@ -182,15 +182,10 @@ async def async_set_context(
     _LOGGER.info("Set context for %s", phone)
 
 
-async def _resolve_phone(
+async def _resolve_phone_from_contact(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> str | None:
-    """Resolve phone number from phone or contact_id (entity_id)."""
-    # Check if phone is directly provided
-    if "phone" in data and data["phone"]:
-        return data["phone"]
-
-    # Check if contact_id is provided (could be entity_id or contact_id)
+    """Resolve phone number from contact_id (entity_id or contact_id)."""
     contact_id = data.get("contact_id")
     if not contact_id:
         return None
@@ -203,21 +198,15 @@ async def _resolve_phone(
     storage = TextNowStorage(hass, coordinator.entry.entry_id)
     contacts = await storage.async_get_contacts()
     if contact_id in contacts:
-        phone = contacts[contact_id]["phone"]
-        # Auto-fill phone in data if not already set
-        if "phone" not in data or not data["phone"]:
-            data["phone"] = phone
-        return phone
+        return contacts[contact_id]["phone"]
 
     # Try to get from entity state if it's an entity_id
     if contact_id.startswith("sensor."):
         state = hass.states.get(contact_id)
         if state and state.attributes.get("phone"):
-            phone = state.attributes["phone"]
-            if "phone" not in data or not data["phone"]:
-                data["phone"] = phone
-            return phone
+            return state.attributes["phone"]
 
+    _LOGGER.error("Contact not found: %s", contact_id)
     return None
 
 

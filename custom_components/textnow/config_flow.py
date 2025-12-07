@@ -15,6 +15,7 @@ from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN, DEFAULT_POLLING_INTERVAL
 from .storage import TextNowStorage
+from .phone_utils import format_phone_number
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -279,6 +280,8 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Add a new contact."""
+        errors = {}
+        
         if user_input is None:
             return self.async_show_form(
                 step_id="add_contact",
@@ -286,6 +289,20 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
                     vol.Required("name"): str,
                     vol.Required("phone"): str,
                 }),
+            )
+
+        # Format and validate phone number
+        try:
+            formatted_phone = format_phone_number(user_input["phone"])
+        except ValueError as e:
+            errors["base"] = "invalid_phone"
+            return self.async_show_form(
+                step_id="add_contact",
+                data_schema=vol.Schema({
+                    vol.Required("name", default=user_input.get("name", "")): str,
+                    vol.Required("phone", default=user_input.get("phone", "")): str,
+                }),
+                errors=errors,
             )
 
         storage = TextNowStorage(self.hass, self.config_entry.entry_id)
@@ -300,7 +317,7 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
             counter += 1
 
         await storage.async_save_contact(
-            contact_id, user_input["name"], user_input["phone"]
+            contact_id, user_input["name"], formatted_phone
         )
 
         # Fire event to add sensor
@@ -326,18 +343,36 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
             return self.async_abort(reason="contact_not_found")
 
         contact = contacts[contact_id]
+        errors = {}
 
         if user_input is None:
+            # Remove +1 prefix for display
+            display_phone = contact.get("phone", "").replace("+1", "")
             return self.async_show_form(
                 step_id="edit_contact",
                 data_schema=vol.Schema({
                     vol.Required("name", default=contact.get("name", "")): str,
-                    vol.Required("phone", default=contact.get("phone", "")): str,
+                    vol.Required("phone", default=display_phone): str,
                 }),
             )
 
+        # Format and validate phone number
+        try:
+            formatted_phone = format_phone_number(user_input["phone"])
+        except ValueError as e:
+            errors["base"] = "invalid_phone"
+            display_phone = user_input.get("phone", "").replace("+1", "")
+            return self.async_show_form(
+                step_id="edit_contact",
+                data_schema=vol.Schema({
+                    vol.Required("name", default=user_input.get("name", "")): str,
+                    vol.Required("phone", default=display_phone): str,
+                }),
+                errors=errors,
+            )
+
         await storage.async_save_contact(
-            contact_id, user_input["name"], user_input["phone"]
+            contact_id, user_input["name"], formatted_phone
         )
 
         return self.async_create_entry(title="", data={})

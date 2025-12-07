@@ -35,7 +35,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .config_panel import async_setup_config_panel
     await async_setup_config_panel(hass, {})
 
+    # Register side menu panel
+    await async_register_panel(hass)
+
     return True
+
+
+async def async_register_panel(hass: HomeAssistant) -> None:
+    """Register the TextNow panel in the side menu."""
+    from homeassistant.components.frontend import async_register_built_in_panel
+    
+    # Register panel
+    hass.http.register_static_path(
+        "/textnow-panel",
+        hass.config.path("custom_components/textnow/panel"),
+        cache_headers=False,
+    )
+    
+    # Add to sidebar
+    await hass.components.frontend.async_register_built_in_panel(
+        component_name="custom",
+        sidebar_title="TextNow",
+        sidebar_icon="mdi:message-text",
+        frontend_url_path="textnow",
+        require_admin=False,
+        config={
+            "_panel_custom": {
+                "name": "textnow-panel",
+                "embed_iframe": False,
+                "trust_external": False,
+                "js_url": "/textnow-panel/panel.js",
+            },
+            "_panel_source": "textnow-panel",
+        },
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

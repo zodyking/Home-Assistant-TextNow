@@ -10,6 +10,7 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN
 from .storage import TextNowStorage
+from .phone_utils import format_phone_number
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,12 +67,16 @@ class TextNowConfigPanelView(HomeAssistantView):
             phone = data.get("phone")
             
             if contact_id and name and phone:
-                await storage.async_save_contact(contact_id, name, phone)
-                hass.bus.async_fire(
-                    f"{DOMAIN}_contact_added",
-                    {"contact_id": contact_id, "name": name, "phone": phone},
-                )
-                return self.json({"success": True})
+                try:
+                    formatted_phone = format_phone_number(phone)
+                    await storage.async_save_contact(contact_id, name, formatted_phone)
+                    hass.bus.async_fire(
+                        f"{DOMAIN}_contact_added",
+                        {"contact_id": contact_id, "name": name, "phone": formatted_phone},
+                    )
+                    return self.json({"success": True})
+                except ValueError as e:
+                    return self.json({"error": str(e)}, status_code=400)
         
         elif action == "delete_contact":
             storage = TextNowStorage(hass, entry_id)
@@ -92,8 +97,12 @@ class TextNowConfigPanelView(HomeAssistantView):
             phone = data.get("phone")
             
             if contact_id and name and phone:
-                await storage.async_save_contact(contact_id, name, phone)
-                return self.json({"success": True})
+                try:
+                    formatted_phone = format_phone_number(phone)
+                    await storage.async_save_contact(contact_id, name, formatted_phone)
+                    return self.json({"success": True})
+                except ValueError as e:
+                    return self.json({"error": str(e)}, status_code=400)
 
         return self.json({"error": "Invalid action"}, status_code=400)
 
