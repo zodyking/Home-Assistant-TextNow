@@ -56,7 +56,8 @@ prompt:
     ttl_seconds:
       name: TTL Seconds
       description: Time to live for pending expectation in seconds. Leave empty to use default (300 seconds).
-      required: false
+      required: true
+      default: 300
       example: 300
       selector:
         number:
@@ -73,15 +74,17 @@ prompt:
         text:
     response_variable:
       name: Response Variable
-      description: Variable name to store the response (e.g., "user_choice"). Use the textnow.wait_for_reply service after this prompt to wait for and capture the response.
-      required: false
+      description: Variable name to store the response (e.g., "user_choice"). Use the textnow.wait_for_reply service after this prompt to wait for and capture the response. Leave empty to not store response.
+      required: true
+      default: ""
       example: "user_choice"
       selector:
         text:
     keep_pending:
       name: Keep Pending
-      description: If true, don't clear pending expectation after first match. Leave empty (false) to clear after first reply.
-      required: false
+      description: If true, don't clear pending expectation after first match. Set to false to clear after first reply.
+      required: true
+      default: false
       selector:
         boolean:
 

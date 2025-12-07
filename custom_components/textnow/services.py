@@ -99,12 +99,13 @@ async def async_prompt_message(
 
     key = data.get("key", "")
     prompt = data.get("prompt", "")
-    ttl_seconds = data.get("ttl_seconds")  # None if not provided, will use default
-    if ttl_seconds is None:
-        ttl_seconds = 300  # Default value
+    ttl_seconds = data.get("ttl_seconds", 300)  # Default 300 if not provided
     options = data.get("options")
-    keep_pending = data.get("keep_pending", False)  # Default to False if not provided
-    response_variable = data.get("response_variable")  # Variable name to store response
+    keep_pending = data.get("keep_pending", False)  # Default False
+    response_variable = data.get("response_variable", "")  # Empty string if not provided
+    # Treat empty string as None for response_variable
+    if response_variable == "":
+        response_variable = None
 
     if not key or not prompt:
         _LOGGER.error("Key and prompt are required")
