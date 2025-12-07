@@ -20,7 +20,7 @@
 - 📱 **Full SMS Support** - Send and receive SMS messages through TextNow
 - 🔄 **Automatic Polling** - Real-time message polling with deduplication
 - 👥 **Contact Management** - UI-managed contact list with names and phone numbers
-- 🎯 **Smart Prompts** - Send prompts and parse replies (choice, text, number, boolean)
+- 🎯 **Smart Choice Prompts** - Send prompts with numbered options and parse user selections
 - 📊 **Sensor Entities** - Per-contact sensors with message history and context
 - 🔐 **Security** - Phone number allowlist for enhanced security
 - 💾 **Persistent Storage** - Contacts, pending expectations, and context data
@@ -53,13 +53,15 @@
 
 ### Initial Setup
 
+The initial setup only requires your TextNow account credentials:
+
 1. **Username**: Your TextNow account username
 2. **connect.sid Cookie**: Found in your browser's cookies when logged into TextNow
    - Open browser DevTools (F12) → Application/Storage → Cookies → `https://www.textnow.com`
    - Copy the value of `connect.sid`
 3. **_csrf Cookie**: Same location, copy the value of `_csrf`
-4. **Polling Interval**: How often to check for new messages (default: 30 seconds)
-5. **Allowed Phones**: Comma-separated list of phone numbers to accept messages from (security feature)
+
+**Note:** Polling interval and allowed phones can be configured later in the Options menu.
 
 ### Managing Contacts
 
@@ -85,27 +87,28 @@ data:
 
 #### `textnow.prompt`
 
-Send a prompt message and wait for a reply. The reply will be parsed and a `textnow_reply_parsed` event will be fired.
+Send a prompt message with numbered choices and wait for a reply. The reply will be parsed and a `textnow_reply_parsed` event will be fired.
+
+**Features:**
+- Automatically numbers options (1, 2, 3, etc.)
+- Accepts replies by number or text match
+- Contact selection auto-fills phone number
+- Options are required (newline or comma-separated)
 
 ```yaml
 service: textnow.prompt
 data:
-  contact_id: contact_1
+  contact_id: sensor.textnow_contact_1  # Select from dropdown or use contact_id
   key: user_choice
   prompt: "Please choose an option"
-  type: choice
-  options:
-    - "Option 1"
-    - "Option 2"
-    - "Option 3"
+  options: "Option 1\nOption 2\nOption 3"  # Required - newline or comma-separated
   ttl_seconds: 300
 ```
 
-**Prompt Types:**
-- `choice` - Expects a numbered choice or text match from options
-- `text` - Accepts any text (optionally with regex validation)
-- `number` - Expects a numeric value
-- `boolean` - Expects yes/no, true/false, etc.
+**Contact Selection:**
+- Use entity selector to choose from your TextNow contacts
+- Phone number auto-fills when a contact is selected
+- Can also use `contact_id` directly (e.g., `contact_1`) or `phone` number
 
 #### `textnow.clear_pending`
 
@@ -204,12 +207,8 @@ automation:
         data:
           contact_id: "{{ trigger.event.data.contact_id }}"
           key: "menu_choice"
-          prompt: "1. Lights\n2. Temperature\n3. Music"
-          type: choice
-          options:
-            - "Lights"
-            - "Temperature"
-            - "Music"
+          prompt: "Please choose an option:"
+          options: "Lights\nTemperature\nMusic"
           ttl_seconds: 300
 ```
 
@@ -245,8 +244,8 @@ automation:
                 data:
                   contact_id: "{{ trigger.event.data.contact_id }}"
                   key: "lights_action"
-                  prompt: "Enter your command (e.g., 'turn on', 'dim 50%')"
-                  type: text
+                  prompt: "What would you like to do?"
+                  options: "Turn On\nTurn Off\nDim 50%\nDim 25%"
                   ttl_seconds: 300
 
   - alias: "TextNow - Execute Action with TTS"
@@ -295,20 +294,35 @@ automation:
           message: "You chose lights last time too!"
 ```
 
-### Example 4: Regex Validation
+### Example 4: Contact Autocomplete
 
-Validate text input with regex patterns:
+Using the entity selector for easy contact selection:
 
 ```yaml
 service: textnow.prompt
 data:
-  contact_id: contact_1
-  key: "zip_code"
-  prompt: "Enter your zip code (5 digits)"
-  type: text
-  regex: "^\\d{5}$"
+  contact_id: sensor.textnow_john  # Select from entity dropdown
+  key: "user_preference"
+  prompt: "Choose your preference:"
+  options: "Email\nSMS\nPhone Call"
   ttl_seconds: 300
 ```
+
+**Note:** When using the service UI, you can select contacts from a dropdown, and the phone number will automatically fill in.
+
+## 🎯 Key Features
+
+### Contact Autocomplete
+- All services support entity selector for contacts
+- Select `sensor.textnow_<contact_name>` from dropdown
+- Phone number automatically fills when contact is selected
+- Works in both YAML and UI service calls
+
+### Choice-Based Prompts
+- All prompts use choice-based selection
+- Options are automatically numbered (1, 2, 3, etc.)
+- Users can reply with number or text match
+- Supports partial text matching
 
 ## 🔧 Advanced Features
 
@@ -319,10 +333,10 @@ Allow multiple replies to the same prompt:
 ```yaml
 service: textnow.prompt
 data:
-  contact_id: contact_1
+  contact_id: sensor.textnow_contact_1
   key: "multiple_items"
-  prompt: "Enter items (one per message, send DONE when finished)"
-  type: text
+  prompt: "Select items (reply with number, send DONE when finished):"
+  options: "Item 1\nItem 2\nItem 3\nDONE"
   keep_pending: true
   ttl_seconds: 600
 ```
@@ -337,7 +351,8 @@ Phone numbers should be in E.164 format (e.g., `+1234567890`) for best compatibi
 |-------|----------|
 | Messages not being received | Check that the phone number is in the `allowed_phones` list |
 | Prompts not working | Ensure the TTL hasn't expired (default 300 seconds) |
-| Contact not found | Make sure the `contact_id` matches exactly (case-sensitive) |
+| Contact not found | Use the entity selector (`sensor.textnow_contact_name`) or ensure `contact_id` matches exactly |
+| Options not working | Options field is required - provide at least one option (newline or comma-separated) |
 | Authentication errors | Verify cookies are valid and not expired. Re-copy from browser |
 | API errors | Check the Home Assistant logs for detailed error messages |
 
