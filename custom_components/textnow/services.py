@@ -40,7 +40,6 @@ SERVICE_CLEAR_PENDING_SCHEMA = vol.Schema(
     {
         vol.Exclusive("phone", "recipient"): str,
         vol.Exclusive("contact_id", "recipient"): str,
-        vol.Optional("key"): str,
     }
 )
 
