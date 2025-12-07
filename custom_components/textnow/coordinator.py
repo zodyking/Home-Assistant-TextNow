@@ -204,23 +204,30 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
 
             parsed = parse_reply(text, prompt_type, options, regex)
             if parsed:
-                # Note: response_variable is stored in pending_data but the actual response
-                # is accessible via the textnow_reply_parsed event data in automations
-                # Users should use wait_for_trigger to wait for the event and access trigger.event.data.value
+                # Get response value (option number for choice type)
+                if parsed.get("option_index") is not None:
+                    response_value = str(parsed.get("option_index") + 1)  # 1, 2, 3, etc.
+                else:
+                    response_value = str(parsed["value"])
                 
-                # Fire reply parsed event
-                self.hass.bus.async_fire(
-                    EVENT_REPLY_PARSED,
-                    {
-                        ATTR_PHONE: phone,
-                        ATTR_CONTACT_ID: contact_id,
-                        ATTR_KEY: key,
-                        ATTR_TYPE: parsed["type"],
-                        ATTR_VALUE: parsed["value"],
-                        ATTR_RAW_TEXT: parsed["raw_text"],
-                        ATTR_OPTION_INDEX: parsed.get("option_index"),
-                    },
-                )
+                # Fire reply parsed event with response_variable name if specified
+                event_data = {
+                    ATTR_PHONE: phone,
+                    ATTR_CONTACT_ID: contact_id,
+                    ATTR_KEY: key,
+                    ATTR_TYPE: parsed["type"],
+                    ATTR_VALUE: parsed["value"],
+                    ATTR_RAW_TEXT: parsed["raw_text"],
+                    ATTR_OPTION_INDEX: parsed.get("option_index"),
+                    "response_number": response_value,  # The option number (1, 2, 3, etc.)
+                }
+                
+                # Include response_variable name in event if specified
+                response_variable = pending_data.get("response_variable")
+                if response_variable:
+                    event_data["response_variable"] = response_variable
+                
+                self.hass.bus.async_fire(EVENT_REPLY_PARSED, event_data)
 
                 # Clear pending unless keep_pending is True
                 if not pending_data.get("keep_pending", False):

@@ -72,7 +72,7 @@ prompt:
         text:
     response_variable:
       name: Response Variable
-      description: Variable name to store the response (e.g., "user_choice"). The response will be stored as the selected option number (1, 2, 3, etc.) when user replies. Access it in subsequent actions using {{ trigger.event.data.value }} after waiting for the textnow_reply_parsed event.
+      description: Variable name to store the response (e.g., "user_choice"). After waiting for the textnow_reply_parsed event, use the "variables" action to set this variable from trigger.event.data.response_number (1, 2, 3, etc.).
       required: false
       example: "user_choice"
       selector:
