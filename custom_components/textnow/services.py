@@ -20,10 +20,8 @@ SERVICE_SEND_SCHEMA = vol.Schema(
         vol.Required("message"): str,
         vol.Exclusive("phone", "recipient"): str,
         vol.Exclusive("contact_id", "recipient"): str,
-        vol.Optional("message_type", default="sms"): vol.In(["sms", "mms", "voice"]),
-        vol.Optional("media_url"): str,
-        vol.Optional("tts_api_key"): str,
-        vol.Optional("tts_api_url"): str,
+        vol.Optional("message_type", default="sms"): vol.In(["sms", "mms"]),
+        vol.Optional("photo_url"): str,
     }
 )
 

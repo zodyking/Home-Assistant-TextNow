@@ -24,8 +24,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required("username"): str,
         vol.Required("connect_sid"): str,
         vol.Required("csrf"): str,
-        vol.Optional("tts_api_key"): str,
-        vol.Optional("tts_api_url"): str,
     }
 )
 
@@ -67,8 +65,6 @@ class TextNowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "connect_sid": user_input["connect_sid"],
                 "csrf": user_input["csrf"],
                 "polling_interval": DEFAULT_POLLING_INTERVAL,
-                "tts_api_key": user_input.get("tts_api_key", ""),
-                "tts_api_url": user_input.get("tts_api_url", ""),
             },
         )
 
@@ -125,8 +121,6 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
                 "connect_sid": user_input["connect_sid"],
                 "csrf": user_input["csrf"],
                 "polling_interval": user_input.get("polling_interval", DEFAULT_POLLING_INTERVAL),
-                "tts_api_key": user_input.get("tts_api_key", ""),
-                "tts_api_url": user_input.get("tts_api_url", ""),
             })
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             
@@ -155,14 +149,6 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
                         "polling_interval", DEFAULT_POLLING_INTERVAL
                     ),
                 ): int,
-                vol.Optional(
-                    "tts_api_key",
-                    default=self.config_entry.data.get("tts_api_key", "")
-                ): str,
-                vol.Optional(
-                    "tts_api_url",
-                    default=self.config_entry.data.get("tts_api_url", "")
-                ): str,
             }
         )
 

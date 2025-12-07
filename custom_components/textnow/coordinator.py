@@ -292,44 +292,36 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("HTTP error sending message: %s", e)
             raise
 
-    async def send_mms(self, phone: str, message: str, media_url: str) -> None:
-        """Send an MMS message with media."""
+    async def send_mms(self, phone: str, message: str, photo_url: str, www_path: str) -> None:
+        """Send an MMS message with photo from www folder."""
         await self._ensure_session()
         if self.session is None:
             raise Exception("Session not initialized")
 
-        # Download media file if it's a URL
-        import tempfile
         import os
         from pathlib import Path
         
-        media_file = None
-        try:
-            # Handle different URL types
-            if media_url.startswith("file://"):
-                # Local file
-                file_path = media_url.replace("file://", "")
-                if not os.path.exists(file_path):
-                    raise Exception(f"Media file not found: {file_path}")
-                media_file = file_path
-            elif media_url.startswith(("http://", "https://")):
-                # Download from URL
-                _LOGGER.debug("Downloading media from URL: %s", media_url)
-                async with self.session.get(media_url) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"Failed to download media: {resp.status}")
-                    
-                    # Create temp file
-                    suffix = Path(media_url).suffix or ".tmp"
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-                        async for chunk in resp.content.iter_chunked(8192):
-                            tmp_file.write(chunk)
-                        media_file = tmp_file.name
+        # Handle /local/ URLs (Home Assistant www folder)
+        if photo_url.startswith("/local/"):
+            # Remove /local/ prefix and get filename
+            filename = photo_url.replace("/local/", "").lstrip("/")
+            media_file = os.path.join(www_path, filename)
+        elif photo_url.startswith("local/"):
+            # Handle without leading slash
+            filename = photo_url.replace("local/", "").lstrip("/")
+            media_file = os.path.join(www_path, filename)
+        else:
+            # Assume it's already a full path or relative to www
+            if os.path.isabs(photo_url):
+                media_file = photo_url
             else:
-                # Assume local file path
-                if not os.path.exists(media_url):
-                    raise Exception(f"Media file not found: {media_url}")
-                media_file = media_url
+                media_file = os.path.join(www_path, photo_url)
+        
+        # Verify file exists
+        if not os.path.exists(media_file):
+            raise Exception(f"Photo file not found: {media_file} (www folder: {www_path})")
+        
+        try:
 
             # Upload media and send MMS
             # POST /api/users/{username}/messages with multipart/form-data
@@ -375,64 +367,9 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.debug("MMS sent successfully to %s", phone)
                 await self._update_contact_last_outbound_by_phone(phone)
 
-        finally:
-            # Clean up temp file if we created one
-            if media_file and media_url.startswith(("http://", "https://")):
-                try:
-                    os.unlink(media_file)
-                except Exception:
-                    pass
-
-    async def send_voice_message(
-        self, phone: str, message: str, tts_api_key: str, tts_api_url: str
-    ) -> None:
-        """Send a voice message by converting text to speech and sending as MMS."""
-        import tempfile
-        import os
-        
-        # Generate audio using TTS API
-        _LOGGER.debug("Generating audio for voice message using TTS API")
-        
-        audio_file = None
-        try:
-            # Call TTS API
-            tts_session = aiohttp.ClientSession()
-            try:
-                headers = {
-                    "Authorization": f"Bearer {tts_api_key}",
-                    "Content-Type": "application/json",
-                }
-                payload = {"text": message, "format": "mp3"}
-                
-                async with tts_session.post(tts_api_url, json=payload, headers=headers) as resp:
-                    if resp.status != 200:
-                        error_text = await resp.text()
-                        _LOGGER.error(
-                            "TTS API error: %s %s", resp.status, error_text
-                        )
-                        raise Exception(f"TTS API error: {resp.status}")
-                    
-                    # Save audio to temp file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                        async for chunk in resp.content.iter_chunked(8192):
-                            tmp_file.write(chunk)
-                        audio_file = tmp_file.name
-                    
-                    _LOGGER.debug("Audio generated, saved to %s", audio_file)
-            finally:
-                await tts_session.close()
-
-            # Send as MMS
-            await self.send_mms(phone, "", f"file://{audio_file}")
-            _LOGGER.info("Voice message sent successfully to %s", phone)
-
-        finally:
-            # Clean up temp file
-            if audio_file:
-                try:
-                    os.unlink(audio_file)
-                except Exception:
-                    pass
+        except Exception as e:
+            _LOGGER.error("Error sending MMS: %s", e)
+            raise
 
     async def _update_contact_last_outbound_by_phone(self, phone: str) -> None:
         """Update last outbound timestamp for contact by phone number."""

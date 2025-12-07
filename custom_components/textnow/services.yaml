@@ -1,6 +1,6 @@
 send:
   name: Send Message
-  description: Send an SMS, MMS, or voice message to a contact.
+  description: Send an SMS or MMS message to a contact.
   fields:
     contact_id:
       name: Contact
@@ -16,7 +16,7 @@ send:
               integration: textnow
     message:
       name: Message
-      description: Message text to send. For voice messages, this text will be converted to speech using the configured TTS API.
+      description: Message text to send.
       required: true
       example: "Hello, this is a test message"
       selector:
@@ -24,7 +24,7 @@ send:
           multiline: true
     message_type:
       name: Message Type
-      description: Type of message to send. SMS for text, MMS for media, voice for text-to-speech audio.
+      description: Type of message to send. SMS for text only, MMS for text with photo.
       required: true
       default: "sms"
       selector:
@@ -32,26 +32,11 @@ send:
           options:
             - sms
             - mms
-            - voice
-    media_url:
-      name: Media URL
-      description: URL of media file to send (required for MMS). Can be a local file path (file://) or HTTP/HTTPS URL.
+    photo_url:
+      name: Photo URL
+      description: URL of photo from www folder (required for MMS). Use format: /local/filename.jpg (files in config/www/)
       required: false
-      example: "https://example.com/image.jpg"
-      selector:
-        text:
-    tts_api_key:
-      name: TTS API Key
-      description: API key for text-to-speech service (optional, uses config entry default if not provided). Required for voice messages.
-      required: false
-      example: "your-api-key"
-      selector:
-        text:
-    tts_api_url:
-      name: TTS API URL
-      description: API endpoint URL for text-to-speech service (optional, uses config entry default if not provided).
-      required: false
-      example: "https://api.example.com/tts"
+      example: "/local/myphoto.jpg"
       selector:
         text:
 
