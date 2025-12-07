@@ -65,10 +65,24 @@ The initial setup only requires your TextNow account credentials:
 
 ### Managing Contacts
 
+Contacts can be managed in two ways:
+
+**Option 1: Side Menu (Recommended)**
+1. Click **TextNow** in the Home Assistant side menu
+2. Use the GUI to add, edit, or delete contacts
+3. Phone numbers are automatically formatted as `+1XXXXXXXXXX` (10 digits required)
+
+**Option 2: Integration Options**
 1. Go to **Settings** → **Devices & Services** → **TextNow** → **Options**
 2. Select **Contacts** to manage your contact list
-3. Add contacts with a name and phone number
+3. Add contacts with a name and phone number (10 digits, auto-formatted with +1 prefix)
 4. Each contact creates a sensor entity: `sensor.textnow_<contact_name>`
+
+**Phone Number Format:**
+- Enter 10 digits (e.g., `2122037678`)
+- Automatically formatted to `+12122037678`
+- Non-numeric characters are stripped
+- Leading "1" is handled automatically
 
 ## 🎮 Usage
 
@@ -76,14 +90,16 @@ The initial setup only requires your TextNow account credentials:
 
 #### `textnow.send`
 
-Send an SMS message to a phone number or contact.
+Send an SMS message to a contact.
 
 ```yaml
 service: textnow.send
 data:
-  contact_id: contact_1
+  contact_id: sensor.textnow_contact_1  # Select from entity dropdown
   message: "Hello, this is a test message"
 ```
+
+**Note:** Only `contact_id` is required. The phone number is automatically retrieved from the selected contact.
 
 #### `textnow.prompt`
 
@@ -112,23 +128,23 @@ data:
 
 #### `textnow.clear_pending`
 
-Clear pending expectations for a phone number or contact.
+Clear pending expectations for a contact.
 
 ```yaml
 service: textnow.clear_pending
 data:
-  contact_id: contact_1
+  contact_id: sensor.textnow_contact_1  # Select from entity dropdown
   key: user_choice  # Optional: clears all if not specified
 ```
 
 #### `textnow.set_context`
 
-Set or merge context data for a phone number or contact.
+Set or merge context data for a contact.
 
 ```yaml
 service: textnow.set_context
 data:
-  contact_id: contact_1
+  contact_id: sensor.textnow_contact_1  # Select from entity dropdown
   data:
     step: 1
     user_name: "John"
@@ -312,17 +328,24 @@ data:
 
 ## 🎯 Key Features
 
-### Contact Autocomplete
-- All services support entity selector for contacts
-- Select `sensor.textnow_<contact_name>` from dropdown
-- Phone number automatically fills when contact is selected
+### Contact-Only Services
+- All services require only `contact_id` (no phone field)
+- Select `sensor.textnow_<contact_name>` from entity dropdown
+- Phone number automatically retrieved from contact
 - Works in both YAML and UI service calls
+
+### Automatic Phone Formatting
+- Phone numbers automatically formatted as `+1XXXXXXXXXX`
+- Validates exactly 10 digits
+- Strips non-numeric characters
+- Handles leading "1" country code
 
 ### Choice-Based Prompts
 - All prompts use choice-based selection
 - Options are automatically numbered (1, 2, 3, etc.)
 - Users can reply with number or text match
 - Supports partial text matching
+- Options field is required
 
 ## 🔧 Advanced Features
 
