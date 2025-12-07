@@ -48,8 +48,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     # Register static path for panel files
     panel_path = os.path.join(os.path.dirname(__file__), "panel")
     await hass.http.async_register_static_paths(
-        {"/textnow-panel": panel_path},
-        cache_headers=False,
+        {"/textnow-panel": panel_path}
     )
     
     # Register custom panel
