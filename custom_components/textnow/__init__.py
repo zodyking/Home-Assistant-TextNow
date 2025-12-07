@@ -45,26 +45,22 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the TextNow panel in the side menu."""
     import os
     
-    # Register static path for panel files
-    panel_path = os.path.join(os.path.dirname(__file__), "panel")
-    await hass.http.async_register_static_paths(
-        {"/textnow-panel": panel_path}
-    )
+    # Get panel directory path
+    panel_dir = os.path.join(os.path.dirname(__file__), "panel")
     
-    # Register custom panel
+    # Register static path
+    hass.http.register_static_path("/textnow-panel", panel_dir)
+    
+    # Register panel in sidebar
     await hass.components.frontend.async_register_built_in_panel(
-        component_name="custom",
+        component_name="iframe",
         sidebar_title="TextNow",
         sidebar_icon="mdi:message-text",
         frontend_url_path="textnow",
         require_admin=False,
         config={
-            "_panel_custom": {
-                "name": "textnow-panel",
-                "embed_iframe": False,
-                "trust_external": False,
-                "js_url": "/textnow-panel/panel.js",
-            },
+            "url": "/textnow-panel/panel.html",
+            "title": "TextNow Contacts",
         },
     )
 
