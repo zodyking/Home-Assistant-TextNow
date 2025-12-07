@@ -125,38 +125,44 @@ class TextNowConfigPanelView(HomeAssistantView):
         return self.json({"error": "Invalid action"}, status_code=400)
 
 
-class TextNowPanelView(HomeAssistantView):
-    """Serve the TextNow panel HTML."""
+class TextNowPanelJSView(HomeAssistantView):
+    """Serve the TextNow panel JavaScript."""
 
-    url = "/api/textnow/panel"
-    name = "api:textnow:panel"
-    requires_auth = True
+    url = "/api/textnow/panel.js"
+    name = "api:textnow:panel.js"
+    requires_auth = False  # JS files need to be accessible without auth
 
     async def get(self, request):
-        """Serve the panel HTML."""
+        """Serve the panel JavaScript file."""
         import os
         
-        # Get panel HTML file path
-        panel_file = os.path.join(
-            os.path.dirname(__file__), "panel", "panel.html"
+        # Try to get panel JS file from www directory first (HACS)
+        www_file = os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "www", "community", "textnow", "textnow-panel.js"
         )
         
-        if not os.path.exists(panel_file):
-            return self.json({"error": "Panel file not found"}, status_code=404)
+        # Fallback to panel directory
+        panel_file = os.path.join(
+            os.path.dirname(__file__), "panel", "panel.js"
+        )
         
-        with open(panel_file, "r", encoding="utf-8") as f:
-            html_content = f.read()
+        js_file = www_file if os.path.exists(www_file) else panel_file
+        
+        if not os.path.exists(js_file):
+            return self.json({"error": "Panel JS file not found"}, status_code=404)
+        
+        with open(js_file, "r", encoding="utf-8") as f:
+            js_content = f.read()
         
         from aiohttp import web
-        response = web.Response(text=html_content, content_type="text/html")
-        # Ensure cookies are sent with iframe requests
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response = web.Response(text=js_content, content_type="application/javascript")
+        response.headers["Cache-Control"] = "no-cache"
         return response
 
 
 async def async_setup_config_panel(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the config panel."""
     hass.http.register_view(TextNowConfigPanelView)
-    hass.http.register_view(TextNowPanelView)
+    hass.http.register_view(TextNowPanelJSView)
     return True
 

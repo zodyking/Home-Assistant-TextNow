@@ -49,7 +49,8 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     try:
         from homeassistant.components.frontend import async_register_built_in_panel
         
-        # Register panel using panel_custom (not iframe) - loads JS module from www directory
+        # Register panel using panel_custom - serve JS through API endpoint
+        # This works regardless of HACS installation method
         await async_register_built_in_panel(
             hass,
             component_name="custom",
@@ -62,8 +63,7 @@ async def async_register_panel(hass: HomeAssistant) -> None:
                     "name": "textnow-panel",
                     "embed_iframe": False,
                     "trust_external": False,
-                    "js_url": "/local/community/textnow/textnow-panel.js",
-                    "module_url": "/local/community/textnow/textnow-panel.js",
+                    "js_url": "/api/textnow/panel.js",
                 },
             },
         )
