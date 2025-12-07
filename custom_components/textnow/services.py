@@ -68,32 +68,18 @@ async def async_send_message(
         return
 
     message_type = data.get("message_type", "sms")
-    media_url = data.get("media_url")
-    tts_api_key = data.get("tts_api_key")
-    tts_api_url = data.get("tts_api_url")
+    photo_url = data.get("photo_url")
 
     try:
         if message_type == "sms":
             await coordinator.send_message(phone, message)
             _LOGGER.info("Sent SMS to %s", phone)
         elif message_type == "mms":
-            if not media_url:
-                _LOGGER.error("media_url is required for MMS")
+            if not photo_url:
+                _LOGGER.error("photo_url is required for MMS")
                 return
-            await coordinator.send_mms(phone, message, media_url)
+            await coordinator.send_mms(phone, message, photo_url, hass.config.path("www"))
             _LOGGER.info("Sent MMS to %s", phone)
-        elif message_type == "voice":
-            # Get TTS config from entry or service call
-            entry = coordinator.entry
-            api_key = tts_api_key or entry.data.get("tts_api_key")
-            api_url = tts_api_url or entry.data.get("tts_api_url")
-            
-            if not api_key or not api_url:
-                _LOGGER.error("TTS API key and URL required for voice messages. Configure in integration options or provide in service call.")
-                return
-            
-            await coordinator.send_voice_message(phone, message, api_key, api_url)
-            _LOGGER.info("Sent voice message to %s", phone)
         else:
             _LOGGER.error("Invalid message_type: %s", message_type)
             return
