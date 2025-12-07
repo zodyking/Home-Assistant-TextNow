@@ -211,20 +211,20 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                         # Set the entity state with the response value
                         # Format: option_index (0-based) for choice type, or value for other types
                         if parsed.get("option_index") is not None:
-                            # Store the option index (0-based) and the value
-                            response_value = f"{parsed.get('option_index') + 1}"  # 1-based for user convenience
+                            # Store the option number (1-based) for user convenience
+                            response_value = str(parsed.get("option_index") + 1)  # 1, 2, 3, etc.
                             response_text = parsed["value"]
                         else:
                             response_value = str(parsed["value"])
                             response_text = parsed["value"]
                         
                         # Set entity state (works for input_text, input_number, etc.)
-                        state = hass.states.get(response_variable)
+                        state = self.hass.states.get(response_variable)
                         if state:
                             # Use set_value service for input_text/input_number
                             domain = response_variable.split(".")[0]
                             if domain in ["input_text", "input_number", "input_select"]:
-                                await hass.services.async_call(
+                                await self.hass.services.async_call(
                                     domain,
                                     "set_value",
                                     {"entity_id": response_variable, "value": response_value}
@@ -232,7 +232,7 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                                 _LOGGER.info("Updated response variable %s = %s (text: %s)", response_variable, response_value, response_text)
                             else:
                                 # For other entity types, try to set state directly
-                                hass.states.async_set(response_variable, response_value, {"text": response_text})
+                                self.hass.states.async_set(response_variable, response_value, {"text": response_text})
                                 _LOGGER.info("Set response variable %s = %s", response_variable, response_value)
                         else:
                             _LOGGER.warning("Response variable entity %s not found", response_variable)
