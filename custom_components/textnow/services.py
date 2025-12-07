@@ -190,23 +190,27 @@ async def _resolve_phone_from_contact(
     if not contact_id:
         return None
 
-    # If it's an entity_id (sensor.textnow_*), extract contact_id
-    if contact_id.startswith("sensor.textnow_"):
-        contact_id = contact_id.replace("sensor.textnow_", "")
+    # First, try to get phone from entity state if it's an entity_id
+    if contact_id.startswith("sensor."):
+        state = hass.states.get(contact_id)
+        if state and state.attributes.get("phone"):
+            phone = state.attributes["phone"]
+            _LOGGER.debug("Resolved phone %s from entity %s", phone, contact_id)
+            return phone
+        # Extract contact_id from entity_id (sensor.textnow_contact_xxx -> contact_xxx)
+        if contact_id.startswith("sensor.textnow_"):
+            contact_id = contact_id.replace("sensor.textnow_", "")
 
     # Get phone from storage
     storage = TextNowStorage(hass, coordinator.entry.entry_id)
     contacts = await storage.async_get_contacts()
     if contact_id in contacts:
-        return contacts[contact_id]["phone"]
+        phone = contacts[contact_id]["phone"]
+        _LOGGER.debug("Resolved phone %s from contact_id %s", phone, contact_id)
+        return phone
 
-    # Try to get from entity state if it's an entity_id
-    if contact_id.startswith("sensor."):
-        state = hass.states.get(contact_id)
-        if state and state.attributes.get("phone"):
-            return state.attributes["phone"]
-
-    _LOGGER.error("Contact not found: %s", contact_id)
+    _LOGGER.error("Contact not found: %s (searched in %d contacts)", contact_id, len(contacts))
+    _LOGGER.debug("Available contact_ids: %s", list(contacts.keys()))
     return None
 
 

@@ -66,17 +66,32 @@ class TextNowConfigPanelView(HomeAssistantView):
             name = data.get("name")
             phone = data.get("phone")
             
-            if contact_id and name and phone:
-                try:
-                    formatted_phone = format_phone_number(phone)
-                    await storage.async_save_contact(contact_id, name, formatted_phone)
-                    hass.bus.async_fire(
-                        f"{DOMAIN}_contact_added",
-                        {"contact_id": contact_id, "name": name, "phone": formatted_phone},
-                    )
-                    return self.json({"success": True})
-                except ValueError as e:
-                    return self.json({"error": str(e)}, status_code=400)
+            if not name or not phone:
+                return self.json({"error": "Name and phone are required"}, status_code=400)
+            
+            # Format phone number (handles +1 prefix, strips non-digits, validates 10 digits)
+            try:
+                formatted_phone = format_phone_number(phone)
+            except ValueError as e:
+                return self.json({"error": str(e)}, status_code=400)
+            
+            # Generate contact_id if not provided
+            if not contact_id:
+                contact_id = f"contact_{name.lower().replace(' ', '_')}"
+                # Ensure unique contact_id
+                contacts = await storage.async_get_contacts()
+                counter = 1
+                original_id = contact_id
+                while contact_id in contacts:
+                    contact_id = f"{original_id}_{counter}"
+                    counter += 1
+            
+            await storage.async_save_contact(contact_id, name, formatted_phone)
+            hass.bus.async_fire(
+                f"{DOMAIN}_contact_added",
+                {"contact_id": contact_id, "name": name, "phone": formatted_phone},
+            )
+            return self.json({"success": True, "contact_id": contact_id, "phone": formatted_phone})
         
         elif action == "delete_contact":
             storage = TextNowStorage(hass, entry_id)
@@ -96,13 +111,17 @@ class TextNowConfigPanelView(HomeAssistantView):
             name = data.get("name")
             phone = data.get("phone")
             
-            if contact_id and name and phone:
-                try:
-                    formatted_phone = format_phone_number(phone)
-                    await storage.async_save_contact(contact_id, name, formatted_phone)
-                    return self.json({"success": True})
-                except ValueError as e:
-                    return self.json({"error": str(e)}, status_code=400)
+            if not contact_id or not name or not phone:
+                return self.json({"error": "contact_id, name, and phone are required"}, status_code=400)
+            
+            # Format phone number (handles +1 prefix, strips non-digits, validates 10 digits)
+            try:
+                formatted_phone = format_phone_number(phone)
+            except ValueError as e:
+                return self.json({"error": str(e)}, status_code=400)
+            
+            await storage.async_save_contact(contact_id, name, formatted_phone)
+            return self.json({"success": True, "phone": formatted_phone})
 
         return self.json({"error": "Invalid action"}, status_code=400)
 
