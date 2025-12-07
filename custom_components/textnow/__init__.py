@@ -31,57 +31,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services
     await async_setup_services(hass, coordinator)
 
-    # Register config panel API
-    from .config_panel import async_setup_config_panel
-    await async_setup_config_panel(hass, {})
+    # Register WebSocket API
+    from .websocket import async_setup as async_setup_websocket
+    async_setup_websocket(hass)
 
-    # Register side menu panel (optional - may fail if frontend not loaded)
-    try:
-        await async_register_panel(hass)
-    except Exception as e:
-        _LOGGER.warning("Failed to register TextNow panel: %s", e)
+    # Register panel (after successful setup)
+    from .panel import async_register_panel
+    await async_register_panel(hass)
 
     return True
-
-
-async def async_register_panel(hass: HomeAssistant) -> None:
-    """Register the TextNow panel in the side menu."""
-    try:
-        # Import frontend component directly (not via hass.components)
-        from homeassistant.components.frontend import async_register_built_in_panel
-        
-        # Register panel using panel_custom - serve JS through API endpoint
-        # This works regardless of HACS installation method
-        result = await async_register_built_in_panel(
-            hass,
-            component_name="custom",
-            sidebar_title="TextNow",
-            sidebar_icon="mdi:message-text",
-            frontend_url_path="textnow",
-            require_admin=False,
-            config={
-                "_panel_custom": {
-                    "name": "textnow-panel",
-                    "embed_iframe": False,
-                    "trust_external": False,
-                    "js_url": "/api/textnow/panel.js",
-                },
-            },
-        )
-        
-        if result is None:
-            _LOGGER.debug("Panel registration returned None (may already be registered)")
-        else:
-            _LOGGER.debug("Panel registered successfully")
-            
-    except ImportError as e:
-        # Frontend component not available
-        _LOGGER.debug("Frontend component not available, skipping panel registration: %s", e)
-        return
-    except Exception as e:
-        # Catch all other errors
-        _LOGGER.warning("Panel registration failed: %s", e, exc_info=True)
-        return
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -90,6 +48,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator = hass.data[DOMAIN].pop(entry.entry_id)
         await coordinator.async_shutdown()
+        
+        # Unregister panel if this was the last entry
+        if not hass.data[DOMAIN]:
+            from .panel import async_unregister_panel
+            await async_unregister_panel(hass)
 
     return unload_ok
 
