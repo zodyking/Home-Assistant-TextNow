@@ -64,6 +64,7 @@ async def async_setup_services(hass: HomeAssistant, coordinator: TextNowDataUpda
         async_send_message,
         async_set_context,
         async_prompt_message,
+        async_wait_for_reply,
     )
 
     async def send_message_service(call):
@@ -82,8 +83,15 @@ async def async_setup_services(hass: HomeAssistant, coordinator: TextNowDataUpda
         """Handle set context service call."""
         await async_set_context(hass, coordinator, call.data)
 
+    async def wait_for_reply_service(call):
+        """Handle wait for reply service call."""
+        result = await async_wait_for_reply(hass, coordinator, call.data)
+        if result:
+            _LOGGER.info("Wait for reply setup: %s", result)
+
     hass.services.async_register(DOMAIN, "send", send_message_service)
     hass.services.async_register(DOMAIN, "prompt", prompt_message_service)
     hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service)
     hass.services.async_register(DOMAIN, "set_context", set_context_service)
+    hass.services.async_register(DOMAIN, "wait_for_reply", wait_for_reply_service)
 

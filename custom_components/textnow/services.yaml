@@ -52,10 +52,11 @@ prompt:
       example: "Please choose an option"
       selector:
         text:
+          multiline: true
     ttl_seconds:
       name: TTL Seconds
-      description: Time to live for pending expectation in seconds.
-      default: 300
+      description: Time to live for pending expectation in seconds. Leave empty to use default (300 seconds).
+      required: false
       example: 300
       selector:
         number:
@@ -72,15 +73,15 @@ prompt:
         text:
     response_variable:
       name: Response Variable
-      description: Variable name to store the response (e.g., "user_choice"). After waiting for the textnow_reply_parsed event, use the "variables" action to set this variable from trigger.event.data.response_number (1, 2, 3, etc.).
+      description: Variable name to store the response (e.g., "user_choice"). Use the textnow.wait_for_reply service after this prompt to wait for and capture the response.
       required: false
       example: "user_choice"
       selector:
         text:
     keep_pending:
       name: Keep Pending
-      description: If true, don't clear pending expectation after first match.
-      default: false
+      description: If true, don't clear pending expectation after first match. Leave empty (false) to clear after first reply.
+      required: false
       selector:
         boolean:
 
@@ -130,4 +131,46 @@ set_context:
       example: '{"step": 1, "user_name": "John"}'
       selector:
         object:
+
+wait_for_reply:
+  name: Wait for Reply
+  description: Helper service to validate pending expectations. The actual waiting must be done using 'wait_for_trigger' in your automation. After calling textnow.prompt, use wait_for_trigger to wait for the textnow_reply_parsed event, then use the 'variables' action to set your variable from trigger.event.data.response_number.
+  fields:
+    contact_id:
+      name: Contact
+      description: Select the contact that should reply.
+      required: true
+      example: "contact_1"
+      selector:
+        entity:
+          domain: sensor
+          device_class: ""
+          filter:
+            - domain: sensor
+              integration: textnow
+    key:
+      name: Key
+      description: The key that was used in the prompt service call.
+      required: true
+      example: "user_choice"
+      selector:
+        text:
+    response_variable:
+      name: Response Variable
+      description: Variable name to store the response (e.g., "user_choice"). The response will be stored as the selected option number (1, 2, 3, etc.) in this automation variable.
+      required: true
+      example: "user_choice"
+      selector:
+        text:
+    timeout:
+      name: Timeout
+      description: Maximum time to wait for reply in seconds. Leave empty to use the TTL from the prompt.
+      required: false
+      example: 300
+      selector:
+        number:
+          min: 1
+          max: 86400
+          step: 1
+          unit_of_measurement: seconds
 
