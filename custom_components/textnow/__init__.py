@@ -46,25 +46,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the TextNow panel in the side menu."""
-    # Wait for frontend component to be loaded
-    await hass.async_add_executor_job(
-        lambda: None
-    )  # Small delay to ensure frontend is ready
-    
     try:
         from homeassistant.components.frontend import async_register_built_in_panel
         
-        # Register panel using iframe component pointing to API endpoint
+        # Register panel using panel_custom (not iframe) - loads JS module from www directory
         await async_register_built_in_panel(
             hass,
-            component_name="iframe",
+            component_name="custom",
             sidebar_title="TextNow",
             sidebar_icon="mdi:message-text",
             frontend_url_path="textnow",
             require_admin=False,
             config={
-                "url": "/api/textnow/panel",
-                "title": "TextNow Contacts",
+                "_panel_custom": {
+                    "name": "textnow-panel",
+                    "embed_iframe": False,
+                    "trust_external": False,
+                    "js_url": "/local/community/textnow/textnow-panel.js",
+                    "module_url": "/local/community/textnow/textnow-panel.js",
+                },
             },
         )
     except ImportError:

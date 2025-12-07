@@ -65,7 +65,6 @@ class TextNowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "connect_sid": user_input["connect_sid"],
                 "csrf": user_input["csrf"],
                 "polling_interval": DEFAULT_POLLING_INTERVAL,
-                "allowed_phones": [],
             },
         )
 
@@ -115,17 +114,14 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Manage account settings."""
         if user_input is not None:
-            # Parse allowed phones
-            allowed_phones = [
-                p.strip()
-                for p in user_input.get("allowed_phones", "").split(",")
-                if p.strip()
-            ]
-            user_input["allowed_phones"] = allowed_phones
-            
             # Update config entry
             data = dict(self.config_entry.data)
-            data.update(user_input)
+            data.update({
+                "username": user_input["username"],
+                "connect_sid": user_input["connect_sid"],
+                "csrf": user_input["csrf"],
+                "polling_interval": user_input.get("polling_interval", DEFAULT_POLLING_INTERVAL),
+            })
             self.hass.config_entries.async_update_entry(self.config_entry, data=data)
             
             # Restart coordinator with new polling interval if changed
@@ -153,12 +149,6 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
                         "polling_interval", DEFAULT_POLLING_INTERVAL
                     ),
                 ): int,
-                vol.Optional(
-                    "allowed_phones",
-                    default=", ".join(
-                        self.config_entry.data.get("allowed_phones", [])
-                    ),
-                ): str,
             }
         )
 

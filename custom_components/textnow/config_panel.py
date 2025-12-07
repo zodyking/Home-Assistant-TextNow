@@ -41,7 +41,6 @@ class TextNowConfigPanelView(HomeAssistantView):
             "entry_id": entry_id,
             "username": config_entry.data.get("username", ""),
             "polling_interval": config_entry.data.get("polling_interval", 30),
-            "allowed_phones": config_entry.data.get("allowed_phones", []),
             "contacts": contacts,
         })
 
