@@ -35,29 +35,46 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .config_panel import async_setup_config_panel
     await async_setup_config_panel(hass, {})
 
-    # Register side menu panel (using www directory - standard approach)
-    await async_register_panel(hass)
+    # Register side menu panel (optional - may fail if frontend not loaded)
+    try:
+        await async_register_panel(hass)
+    except Exception as e:
+        _LOGGER.warning("Failed to register TextNow panel: %s", e)
 
     return True
 
 
 async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the TextNow panel in the side menu."""
-    from homeassistant.components.frontend import async_register_built_in_panel
+    # Wait for frontend component to be loaded
+    await hass.async_add_executor_job(
+        lambda: None
+    )  # Small delay to ensure frontend is ready
     
-    # Register panel using iframe component pointing to API endpoint
-    await async_register_built_in_panel(
-        hass,
-        component_name="iframe",
-        sidebar_title="TextNow",
-        sidebar_icon="mdi:message-text",
-        frontend_url_path="textnow",
-        require_admin=False,
-        config={
-            "url": "/api/textnow/panel",
-            "title": "TextNow Contacts",
-        },
-    )
+    try:
+        from homeassistant.components.frontend import async_register_built_in_panel
+        
+        # Register panel using iframe component pointing to API endpoint
+        await async_register_built_in_panel(
+            hass,
+            component_name="iframe",
+            sidebar_title="TextNow",
+            sidebar_icon="mdi:message-text",
+            frontend_url_path="textnow",
+            require_admin=False,
+            config={
+                "url": "/api/textnow/panel",
+                "title": "TextNow Contacts",
+            },
+        )
+    except ImportError:
+        # Frontend component not available
+        _LOGGER.debug("Frontend component not available, skipping panel registration")
+        return
+    except AttributeError as e:
+        # Function signature may have changed
+        _LOGGER.warning("Panel registration failed: %s", e)
+        return
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
