@@ -43,19 +43,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the TextNow panel in the side menu."""
-    import os
+    from homeassistant.components.frontend import async_register_built_in_panel
     
-    # Use www directory which is automatically served by Home Assistant
-    www_dir = os.path.join(os.path.dirname(__file__), "..", "..", "www", "community", "textnow")
-    panel_file = os.path.join(www_dir, "panel.html")
-    
-    # Check if panel file exists, if not use local panel directory
-    if not os.path.exists(panel_file):
-        panel_file = os.path.join(os.path.dirname(__file__), "panel", "panel.html")
-    
-    # Register panel using iframe component pointing to local API endpoint
-    # We'll serve the panel through our API endpoint instead
-    await hass.components.frontend.async_register_built_in_panel(
+    # Register panel using iframe component pointing to API endpoint
+    await async_register_built_in_panel(
+        hass,
         component_name="iframe",
         sidebar_title="TextNow",
         sidebar_icon="mdi:message-text",
