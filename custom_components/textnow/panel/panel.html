@@ -197,7 +197,12 @@
     async function loadContacts() {
       try {
         // Get entry ID from config entries
-        const response = await fetch('/api/config/config_entries/entry');
+        const response = await fetch('/api/config/config_entries/entry', {
+          credentials: 'same-origin'
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         const entries = await response.json();
         const textnowEntry = entries.find(e => e.domain === 'textnow');
         
@@ -208,14 +213,19 @@
         }
 
         entryId = textnowEntry.entry_id;
-        const configResponse = await fetch(`/api/textnow/config?entry_id=${entryId}`);
+        const configResponse = await fetch(`/api/textnow/config?entry_id=${entryId}`, {
+          credentials: 'same-origin'
+        });
+        if (!configResponse.ok) {
+          throw new Error(`HTTP ${configResponse.status}: ${configResponse.statusText}`);
+        }
         const data = await configResponse.json();
         contacts = data.contacts || {};
         renderContacts();
       } catch (error) {
         console.error('Error loading contacts:', error);
         document.getElementById('contact-list').innerHTML = 
-          '<div class="empty-state">Error loading contacts</div>';
+          `<div class="empty-state">Error loading contacts: ${error.message}</div>`;
       }
     }
 
@@ -292,6 +302,7 @@
         const response = await fetch('/api/textnow/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({
             entry_id: entryId,
             action: editingId ? 'update_contact' : 'add_contact',
@@ -320,6 +331,7 @@
         const response = await fetch('/api/textnow/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({
             entry_id: entryId,
             action: 'delete_contact',

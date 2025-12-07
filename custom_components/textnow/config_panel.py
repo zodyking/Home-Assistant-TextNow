@@ -130,7 +130,10 @@ class TextNowPanelView(HomeAssistantView):
             html_content = f.read()
         
         from aiohttp import web
-        return web.Response(text=html_content, content_type="text/html")
+        response = web.Response(text=html_content, content_type="text/html")
+        # Ensure cookies are sent with iframe requests
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        return response
 
 
 async def async_setup_config_panel(hass: HomeAssistant, config: ConfigType) -> bool:
