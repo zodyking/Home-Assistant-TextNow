@@ -3,13 +3,11 @@
     "step": {
       "user": {
         "title": "TextNow Configuration",
-        "description": "Enter your TextNow account credentials",
+        "description": "Enter your TextNow account credentials to connect",
         "data": {
           "username": "Username",
           "connect_sid": "connect.sid Cookie",
-          "csrf": "_csrf Cookie",
-          "polling_interval": "Polling Interval (seconds)",
-          "allowed_phones": "Allowed Phone Numbers (comma-separated)"
+          "csrf": "_csrf Cookie"
         }
       },
       "account": {
@@ -18,7 +16,15 @@
       },
       "contacts": {
         "title": "Manage Contacts",
-        "description": "Add, edit, or remove contacts"
+        "description": "Current contacts:\n{contacts}\n\nSelect an action:"
+      },
+      "select_contact": {
+        "title": "Select Contact",
+        "description": "Select a contact to {action}"
+      },
+      "confirm_delete": {
+        "title": "Confirm Delete",
+        "description": "Are you sure you want to delete {name}?"
       },
       "add_contact": {
         "title": "Add Contact",

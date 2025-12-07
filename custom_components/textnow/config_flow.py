@@ -23,8 +23,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required("username"): str,
         vol.Required("connect_sid"): str,
         vol.Required("csrf"): str,
-        vol.Optional("polling_interval", default=DEFAULT_POLLING_INTERVAL): int,
-        vol.Optional("allowed_phones", default=""): str,
     }
 )
 
@@ -58,22 +56,15 @@ class TextNowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
             )
 
-        # Parse allowed phones
-        allowed_phones = [
-            p.strip()
-            for p in user_input.get("allowed_phones", "").split(",")
-            if p.strip()
-        ]
-
-        # Create entry
+        # Create entry with defaults for optional settings
         return self.async_create_entry(
             title=user_input["username"],
             data={
                 "username": user_input["username"],
                 "connect_sid": user_input["connect_sid"],
                 "csrf": user_input["csrf"],
-                "polling_interval": user_input.get("polling_interval", DEFAULT_POLLING_INTERVAL),
-                "allowed_phones": allowed_phones,
+                "polling_interval": DEFAULT_POLLING_INTERVAL,
+                "allowed_phones": [],
             },
         )
 
@@ -96,12 +87,15 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the options."""
+        """Manage the options - show menu."""
         if user_input is None:
             return self.async_show_form(
                 step_id="init",
                 data_schema=vol.Schema({
-                    vol.Required("option"): vol.In(["account", "contacts"]),
+                    vol.Required("option"): vol.In({
+                        "account": "Account Settings",
+                        "contacts": "Manage Contacts",
+                    }),
                 }),
             )
         
@@ -170,42 +164,114 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_contacts(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage contacts."""
-        storage = TextNowStorage(self.hass, self.config_entry.entry_id)
-        contacts = await storage.async_get_contacts()
-
+        """Manage contacts - show menu."""
         if user_input is None:
-            # Show list of contacts
+            storage = TextNowStorage(self.hass, self.config_entry.entry_id)
+            contacts = await storage.async_get_contacts()
+            
+            # Build contact list for display
             contact_list = []
-            for contact_id, contact_data in contacts.items():
-                contact_list.append(f"{contact_id}: {contact_data.get('name', 'Unknown')} ({contact_data.get('phone', 'N/A')})")
+            if contacts:
+                for contact_id, contact_data in contacts.items():
+                    name = contact_data.get('name', 'Unknown')
+                    phone = contact_data.get('phone', 'N/A')
+                    contact_list.append(f"• {name} ({phone})")
+                contacts_text = "\n".join(contact_list)
+            else:
+                contacts_text = "No contacts added yet."
 
             return self.async_show_form(
                 step_id="contacts",
                 data_schema=vol.Schema({
-                    vol.Optional("action"): vol.In(["add", "edit", "delete"]),
-                    vol.Optional("contact_id"): vol.In(list(contacts.keys()) if contacts else []),
+                    vol.Required("action"): vol.In({
+                        "add": "Add New Contact",
+                        "edit": "Edit Existing Contact",
+                        "delete": "Delete Contact",
+                        "back": "← Back to Main Menu",
+                    }),
                 }),
-                description_placeholders={"contacts": "\n".join(contact_list) if contact_list else "No contacts"},
+                description_placeholders={"contacts": contacts_text},
             )
 
         action = user_input.get("action")
         if action == "add":
             return await self.async_step_add_contact()
         elif action == "edit":
-            contact_id = user_input.get("contact_id")
-            if contact_id:
-                return await self.async_step_edit_contact(contact_id)
+            return await self.async_step_select_contact("edit")
         elif action == "delete":
-            contact_id = user_input.get("contact_id")
-            if contact_id and contact_id in contacts:
-                await storage.async_delete_contact(contact_id)
-                # Fire event to remove sensor
-                self.hass.bus.async_fire(
-                    f"{DOMAIN}_contact_deleted",
-                    {"contact_id": contact_id},
-                )
-                return self.async_create_entry(title="", data={})
+            return await self.async_step_select_contact("delete")
+        elif action == "back":
+            return await self.async_step_init()
+        
+        return await self.async_step_contacts()
+
+    async def async_step_select_contact(
+        self, action_type: str, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Select a contact for edit or delete."""
+        storage = TextNowStorage(self.hass, self.config_entry.entry_id)
+        contacts = await storage.async_get_contacts()
+
+        if not contacts:
+            return self.async_abort(reason="no_contacts")
+
+        if user_input is None:
+            # Build options dict with display names
+            contact_options = {}
+            for contact_id, contact_data in contacts.items():
+                name = contact_data.get('name', 'Unknown')
+                phone = contact_data.get('phone', 'N/A')
+                contact_options[contact_id] = f"{name} ({phone})"
+
+            return self.async_show_form(
+                step_id=f"select_contact_{action_type}",
+                data_schema=vol.Schema({
+                    vol.Required("contact_id"): vol.In(contact_options),
+                }),
+                description_placeholders={"action": action_type.capitalize()},
+            )
+
+        contact_id = user_input.get("contact_id")
+        if not contact_id:
+            return await self.async_step_contacts()
+
+        if action_type == "edit":
+            return await self.async_step_edit_contact(contact_id)
+        elif action_type == "delete":
+            return await self.async_step_confirm_delete(contact_id)
+
+        return await self.async_step_contacts()
+
+    async def async_step_confirm_delete(
+        self, contact_id: str, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm contact deletion."""
+        storage = TextNowStorage(self.hass, self.config_entry.entry_id)
+        contacts = await storage.async_get_contacts()
+
+        if contact_id not in contacts:
+            return self.async_abort(reason="contact_not_found")
+
+        contact = contacts[contact_id]
+        contact_name = contact.get("name", "Unknown")
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="confirm_delete",
+                data_schema=vol.Schema({
+                    vol.Required("confirm"): bool,
+                }),
+                description_placeholders={"name": contact_name},
+            )
+
+        if user_input.get("confirm"):
+            await storage.async_delete_contact(contact_id)
+            # Fire event to remove sensor
+            self.hass.bus.async_fire(
+                f"{DOMAIN}_contact_deleted",
+                {"contact_id": contact_id},
+            )
+            return self.async_create_entry(title="", data={})
 
         return await self.async_step_contacts()
 
