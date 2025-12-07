@@ -1,5 +1,11 @@
 # TextNow Home Assistant Integration
 
+<div align="center">
+
+![Home Assistant TextNow Integration](images/banner.png)
+
+</div>
+
 A lightweight Home Assistant integration for sending and receiving SMS messages through TextNow.
 
 ## Features
