@@ -27,14 +27,12 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 
 SERVICE_PROMPT_SCHEMA = vol.Schema(
     {
-        vol.Required("key"): str,
         vol.Required("prompt"): str,
         vol.Exclusive("phone", "recipient"): str,
         vol.Exclusive("contact_id", "recipient"): str,
         vol.Optional("ttl_seconds"): int,  # No default - empty means use default
         vol.Required("options"): vol.Any(str, [str]),
         vol.Optional("response_variable"): str,
-        vol.Optional("keep_pending"): bool,  # No default - empty means false
     }
 )
 
@@ -161,12 +159,13 @@ async def async_prompt_message(
         await coordinator.send_message(phone, message)
 
         # Store pending expectation (always choice type)
+        # Use a default key since we removed the key parameter
+        # We'll use phone number as the key (one pending per phone)
         storage = TextNowStorage(hass, coordinator.entry.entry_id)
         pending_data = {
             "type": "choice",
             "created_at": dt_util.utcnow().isoformat(),
             "ttl_seconds": ttl_seconds,
-            "keep_pending": keep_pending,
             "options": options,
         }
 
@@ -174,8 +173,10 @@ async def async_prompt_message(
         if response_variable:
             pending_data["response_variable"] = response_variable
         
-        await storage.async_set_pending(phone, key, pending_data)
-        _LOGGER.info("Sent prompt to %s with key %s (response_variable: %s)", phone, key, response_variable or "none")
+        # Use "default" as the key since we removed the key parameter
+        # This means only one pending prompt per phone at a time
+        await storage.async_set_pending(phone, "default", pending_data)
+        _LOGGER.info("Sent prompt to %s (response_variable: %s)", phone, response_variable or "none")
 
         # Update last_outbound for sensor
         await _update_sensor_outbound(hass, coordinator, phone)

@@ -214,7 +214,6 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 event_data = {
                     ATTR_PHONE: phone,
                     ATTR_CONTACT_ID: contact_id,
-                    ATTR_KEY: key,
                     ATTR_TYPE: parsed["type"],
                     ATTR_VALUE: parsed["value"],
                     ATTR_RAW_TEXT: parsed["raw_text"],
@@ -229,9 +228,8 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 
                 self.hass.bus.async_fire(EVENT_REPLY_PARSED, event_data)
 
-                # Clear pending unless keep_pending is True
-                if not pending_data.get("keep_pending", False):
-                    await self.storage.async_clear_pending(phone, key)
+                # Always clear pending after first match (removed keep_pending feature)
+                await self.storage.async_clear_pending(phone, key)
 
     async def _update_contact_last_inbound(self, contact_id: str, timestamp: str) -> None:
         """Update last inbound timestamp for contact."""

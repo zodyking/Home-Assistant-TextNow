@@ -56,13 +56,6 @@ prompt:
           filter:
             - domain: sensor
               integration: textnow
-    key:
-      name: Key
-      description: A unique identifier for this prompt (e.g., "bedroom_door_prompt" or "user_choice"). This key is used to match replies to the correct prompt when waiting for the textnow_reply_parsed event in your automation.
-      required: true
-      example: "bedroom_door_prompt"
-      selector:
-        text:
     prompt:
       name: Prompt Text
       description: The prompt message to send (options will be numbered automatically).
@@ -98,13 +91,6 @@ prompt:
       example: "user_choice"
       selector:
         text:
-    keep_pending:
-      name: Keep Pending
-      description: If true, don't clear pending expectation after first match. Set to false to clear after first reply.
-      required: true
-      default: false
-      selector:
-        boolean:
 
 clear_pending:
   name: Clear Pending
@@ -122,13 +108,6 @@ clear_pending:
           filter:
             - domain: sensor
               integration: textnow
-    key:
-      name: Key
-      description: Optional specific key to clear (the same key you used in the textnow.prompt service). If not provided, clears all pending expectations for this contact.
-      required: false
-      example: "bedroom_door_prompt"
-      selector:
-        text:
 
 set_context:
   name: Set Context
