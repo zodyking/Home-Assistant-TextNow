@@ -22,6 +22,32 @@ class TextNowConfigPanelView(HomeAssistantView):
     name = "api:textnow:config"
     requires_auth = True
 
+
+class TextNowPanelView(HomeAssistantView):
+    """Serve the TextNow panel HTML."""
+
+    url = "/api/textnow/panel"
+    name = "api:textnow:panel"
+    requires_auth = True
+
+    async def get(self, request):
+        """Serve the panel HTML."""
+        import os
+        
+        # Get panel HTML file path
+        panel_file = os.path.join(
+            os.path.dirname(__file__), "panel", "panel.html"
+        )
+        
+        if not os.path.exists(panel_file):
+            return self.json({"error": "Panel file not found"}, status_code=404)
+        
+        with open(panel_file, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        
+        from aiohttp import web
+        return web.Response(text=html_content, content_type="text/html")
+
     async def get(self, request):
         """Get config panel data."""
         hass = request.app["hass"]
@@ -110,5 +136,6 @@ class TextNowConfigPanelView(HomeAssistantView):
 async def async_setup_config_panel(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the config panel."""
     hass.http.register_view(TextNowConfigPanelView)
+    hass.http.register_view(TextNowPanelView)
     return True
 
