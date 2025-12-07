@@ -1,19 +1,17 @@
 send:
   name: Send Message
-  description: Send an SMS or MMS message to a contact.
+  description: Send an SMS message to a contact.
   fields:
     contact_id:
       name: Contact
       description: Select a contact to send message to.
       required: true
-      example: "contact_1"
+      example: "sensor.textnow_contact_1"
       selector:
         entity:
           domain: sensor
-          device_class: ""
           filter:
-            - domain: sensor
-              integration: textnow
+            - integration: textnow
     message:
       name: Message
       description: Message text to send.
@@ -22,114 +20,3 @@ send:
       selector:
         text:
           multiline: true
-    message_type:
-      name: Message Type
-      description: Type of message to send. SMS for text only, MMS for text with photo.
-      required: true
-      default: "sms"
-      selector:
-        select:
-          options:
-            - sms
-            - mms
-    photo_url:
-      name: Photo URL
-      description: URL of photo from www folder (required for MMS). Use format: /local/filename.jpg (files in config/www/)
-      required: false
-      example: "/local/myphoto.jpg"
-      selector:
-        text:
-
-prompt:
-  name: Prompt
-  description: Send a prompt message with choices and wait for a reply. The reply will be parsed and a textnow_reply_parsed event will be fired.
-  fields:
-    contact_id:
-      name: Contact
-      description: Select a contact to send prompt to.
-      required: true
-      example: "contact_1"
-      selector:
-        entity:
-          domain: sensor
-          device_class: ""
-          filter:
-            - domain: sensor
-              integration: textnow
-    prompt:
-      name: Prompt Text
-      description: The prompt message to send (options will be numbered automatically).
-      required: true
-      example: "Please choose an option"
-      selector:
-        text:
-          multiline: true
-    ttl_seconds:
-      name: TTL Seconds
-      description: Time to live for pending expectation in seconds. Leave empty to use default (300 seconds).
-      required: true
-      default: 300
-      example: 300
-      selector:
-        number:
-          min: 1
-          max: 86400
-          step: 1
-          unit_of_measurement: seconds
-    options:
-      name: Options
-      description: List of options for the user to choose from (as list or newline-separated string). Required.
-      required: true
-      example: "Option 1\nOption 2\nOption 3"
-      selector:
-        text:
-    response_variable:
-      name: Response Variable
-      description: Variable name to store the response in your automation (e.g., "user_choice"). After sending this prompt, use wait_for_trigger to wait for the textnow_reply_parsed event, then use the 'variables' action to set this variable from trigger.event.data.response_number (1, 2, 3, etc.). Leave empty to not store response.
-      required: true
-      default: ""
-      example: "user_choice"
-      selector:
-        text:
-
-clear_pending:
-  name: Clear Pending
-  description: Clear pending expectations for a contact.
-  fields:
-    contact_id:
-      name: Contact
-      description: Select a contact to clear pending for.
-      required: true
-      example: "contact_1"
-      selector:
-        entity:
-          domain: sensor
-          device_class: ""
-          filter:
-            - domain: sensor
-              integration: textnow
-
-set_context:
-  name: Set Context
-  description: Set or merge context data for a contact.
-  fields:
-    contact_id:
-      name: Contact
-      description: Select a contact to set context for.
-      required: true
-      example: "contact_1"
-      selector:
-        entity:
-          domain: sensor
-          device_class: ""
-          filter:
-            - domain: sensor
-              integration: textnow
-    data:
-      name: Data
-      description: Dictionary of context data to merge.
-      required: true
-      example: '{"step": 1, "user_name": "John"}'
-      selector:
-        object:
-

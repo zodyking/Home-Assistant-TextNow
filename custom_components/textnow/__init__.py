@@ -51,35 +51,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup_services(hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator) -> None:
     """Set up services for TextNow."""
     from .services import (
-        async_clear_pending,
         async_send_message,
-        async_set_context,
-        async_prompt_message,
         SERVICE_SEND_SCHEMA,
-        SERVICE_PROMPT_SCHEMA,
-        SERVICE_CLEAR_PENDING_SCHEMA,
-        SERVICE_SET_CONTEXT_SCHEMA,
     )
 
     async def send_message_service(call):
         """Handle send message service call."""
         await async_send_message(hass, coordinator, call.data)
 
-    async def prompt_message_service(call):
-        """Handle prompt message service call."""
-        await async_prompt_message(hass, coordinator, call.data)
-
-    async def clear_pending_service(call):
-        """Handle clear pending service call."""
-        await async_clear_pending(hass, coordinator, call.data)
-
-    async def set_context_service(call):
-        """Handle set context service call."""
-        await async_set_context(hass, coordinator, call.data)
-
-    # Register services with schemas for validation
+    # Register service with schema for validation
     hass.services.async_register(DOMAIN, "send", send_message_service, schema=SERVICE_SEND_SCHEMA)
-    hass.services.async_register(DOMAIN, "prompt", prompt_message_service, schema=SERVICE_PROMPT_SCHEMA)
-    hass.services.async_register(DOMAIN, "clear_pending", clear_pending_service, schema=SERVICE_CLEAR_PENDING_SCHEMA)
-    hass.services.async_register(DOMAIN, "set_context", set_context_service, schema=SERVICE_SET_CONTEXT_SCHEMA)
 
