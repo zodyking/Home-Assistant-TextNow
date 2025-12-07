@@ -115,18 +115,18 @@ async def async_prompt_message(
         _LOGGER.error("Must provide contact_id")
         return
 
-    key = data.get("key", "")
     prompt = data.get("prompt", "")
-    ttl_seconds = data.get("ttl_seconds", 300)  # Default 300 if not provided
+    ttl_seconds = data.get("ttl_seconds")  # None if not provided, will use default
+    if ttl_seconds is None:
+        ttl_seconds = 300  # Default value
     options = data.get("options")
-    keep_pending = data.get("keep_pending", False)  # Default False
     response_variable = data.get("response_variable", "")  # Empty string if not provided
     # Treat empty string as None for response_variable
     if response_variable == "":
         response_variable = None
 
-    if not key or not prompt:
-        _LOGGER.error("Key and prompt are required")
+    if not prompt:
+        _LOGGER.error("Prompt is required")
         return
 
     if not options:
@@ -194,11 +194,10 @@ async def async_clear_pending(
         _LOGGER.error("Must provide contact_id")
         return
 
-    key = data.get("key")  # Optional
-
     storage = TextNowStorage(hass, coordinator.entry.entry_id)
-    await storage.async_clear_pending(phone, key)
-    _LOGGER.info("Cleared pending for %s%s", phone, f" key {key}" if key else "")
+    # Clear all pending for this phone (no key needed anymore)
+    await storage.async_clear_pending(phone, None)
+    _LOGGER.info("Cleared pending for %s", phone)
 
 
 async def async_set_context(

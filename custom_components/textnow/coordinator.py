@@ -230,6 +230,9 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
 
                 # Always clear pending after first match (removed keep_pending feature)
                 await self.storage.async_clear_pending(phone, key)
+                
+                # Only process first match (one pending per phone)
+                break
 
     async def _update_contact_last_inbound(self, contact_id: str, timestamp: str) -> None:
         """Update last inbound timestamp for contact."""
