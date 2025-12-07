@@ -31,6 +31,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Register services
     await async_setup_services(hass, coordinator)
 
+    # Register config panel API
+    from .config_panel import async_setup_config_panel
+    await async_setup_config_panel(hass, {})
+
     return True
 
 

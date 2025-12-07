@@ -78,6 +78,7 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 headers={
                     "X-CSRF-Token": self._csrf,
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
                     "X-Requested-With": "XMLHttpRequest",
                 },
             )
@@ -97,9 +98,9 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
             # Parameters: start_message_id=0&direction=future&page_size=0
             url = f"{self._base_url}/api/users/{self._username}/messages"
             params = {
-                "start_message_id": 0,
+                "start_message_id": "0",
                 "direction": "future",
-                "page_size": 0,
+                "page_size": "0",
             }
 
             async with self.session.get(url, params=params) as response:
