@@ -136,6 +136,8 @@ class TextNowPanelJSView(HomeAssistantView):
         """Serve the panel JavaScript file."""
         import os
         
+        hass = request.app["hass"]
+        
         # Try to get panel JS file from www directory first (HACS)
         www_file = os.path.join(
             os.path.dirname(__file__), "..", "..", "..", "www", "community", "textnow", "textnow-panel.js"
@@ -146,13 +148,24 @@ class TextNowPanelJSView(HomeAssistantView):
             os.path.dirname(__file__), "panel", "panel.js"
         )
         
-        js_file = www_file if os.path.exists(www_file) else panel_file
+        # Check file existence in executor
+        def check_file(path):
+            return os.path.exists(path)
         
-        if not os.path.exists(js_file):
+        www_exists = await hass.async_add_executor_job(check_file, www_file)
+        panel_exists = await hass.async_add_executor_job(check_file, panel_file)
+        
+        js_file = www_file if www_exists else (panel_file if panel_exists else None)
+        
+        if not js_file:
             return self.json({"error": "Panel JS file not found"}, status_code=404)
         
-        with open(js_file, "r", encoding="utf-8") as f:
-            js_content = f.read()
+        # Read file in executor to avoid blocking
+        def read_file(path):
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+        
+        js_content = await hass.async_add_executor_job(read_file, js_file)
         
         from aiohttp import web
         response = web.Response(text=js_content, content_type="application/javascript")

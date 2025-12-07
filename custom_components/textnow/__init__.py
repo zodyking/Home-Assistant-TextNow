@@ -47,11 +47,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_register_panel(hass: HomeAssistant) -> None:
     """Register the TextNow panel in the side menu."""
     try:
+        # Import frontend component directly (not via hass.components)
         from homeassistant.components.frontend import async_register_built_in_panel
         
         # Register panel using panel_custom - serve JS through API endpoint
         # This works regardless of HACS installation method
-        await async_register_built_in_panel(
+        result = await async_register_built_in_panel(
             hass,
             component_name="custom",
             sidebar_title="TextNow",
@@ -67,13 +68,19 @@ async def async_register_panel(hass: HomeAssistant) -> None:
                 },
             },
         )
-    except ImportError:
+        
+        if result is None:
+            _LOGGER.debug("Panel registration returned None (may already be registered)")
+        else:
+            _LOGGER.debug("Panel registered successfully")
+            
+    except ImportError as e:
         # Frontend component not available
-        _LOGGER.debug("Frontend component not available, skipping panel registration")
+        _LOGGER.debug("Frontend component not available, skipping panel registration: %s", e)
         return
-    except AttributeError as e:
-        # Function signature may have changed
-        _LOGGER.warning("Panel registration failed: %s", e)
+    except Exception as e:
+        # Catch all other errors
+        _LOGGER.warning("Panel registration failed: %s", e, exc_info=True)
         return
 
 
