@@ -20,6 +20,10 @@ SERVICE_SEND_SCHEMA = vol.Schema(
         vol.Required("message"): str,
         vol.Exclusive("phone", "recipient"): str,
         vol.Exclusive("contact_id", "recipient"): str,
+        vol.Optional("message_type", default="sms"): vol.In(["sms", "mms", "voice"]),
+        vol.Optional("media_url"): str,
+        vol.Optional("tts_api_key"): str,
+        vol.Optional("tts_api_url"): str,
     }
 )
 
@@ -68,9 +72,36 @@ async def async_send_message(
         _LOGGER.error("Message is required")
         return
 
+    message_type = data.get("message_type", "sms")
+    media_url = data.get("media_url")
+    tts_api_key = data.get("tts_api_key")
+    tts_api_url = data.get("tts_api_url")
+
     try:
-        await coordinator.send_message(phone, message)
-        _LOGGER.info("Sent message to %s", phone)
+        if message_type == "sms":
+            await coordinator.send_message(phone, message)
+            _LOGGER.info("Sent SMS to %s", phone)
+        elif message_type == "mms":
+            if not media_url:
+                _LOGGER.error("media_url is required for MMS")
+                return
+            await coordinator.send_mms(phone, message, media_url)
+            _LOGGER.info("Sent MMS to %s", phone)
+        elif message_type == "voice":
+            # Get TTS config from entry or service call
+            entry = coordinator.entry
+            api_key = tts_api_key or entry.data.get("tts_api_key")
+            api_url = tts_api_url or entry.data.get("tts_api_url")
+            
+            if not api_key or not api_url:
+                _LOGGER.error("TTS API key and URL required for voice messages. Configure in integration options or provide in service call.")
+                return
+            
+            await coordinator.send_voice_message(phone, message, api_key, api_url)
+            _LOGGER.info("Sent voice message to %s", phone)
+        else:
+            _LOGGER.error("Invalid message_type: %s", message_type)
+            return
 
         # Update last_outbound for sensor
         await _update_sensor_outbound(hass, coordinator, phone)
