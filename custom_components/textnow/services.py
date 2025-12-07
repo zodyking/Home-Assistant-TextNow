@@ -93,6 +93,7 @@ async def async_prompt_message(
     ttl_seconds = data.get("ttl_seconds", 300)
     options = data.get("options")
     keep_pending = data.get("keep_pending", False)
+    response_variable = data.get("response_variable")  # Entity ID to store response (e.g., input_text.textnow_response)
 
     if not key or not prompt:
         _LOGGER.error("Key and prompt are required")
@@ -137,8 +138,12 @@ async def async_prompt_message(
             "options": options,
         }
 
+        # Store response_variable in pending data so we can update it when reply is received
+        if response_variable:
+            pending_data["response_variable"] = response_variable
+        
         await storage.async_set_pending(phone, key, pending_data)
-        _LOGGER.info("Sent prompt to %s with key %s", phone, key)
+        _LOGGER.info("Sent prompt to %s with key %s (response_variable: %s)", phone, key, response_variable or "none")
 
         # Update last_outbound for sensor
         await _update_sensor_outbound(hass, coordinator, phone)
