@@ -69,6 +69,18 @@ prompt:
       example: "Option 1\nOption 2\nOption 3"
       selector:
         text:
+    response_variable:
+      name: Response Variable
+      description: Entity ID to store the response (e.g., input_text.textnow_response). The response will be stored as the selected option number (1, 2, 3, etc.) when user replies. This allows you to use the response in subsequent automation actions.
+      required: false
+      example: "input_text.textnow_response"
+      selector:
+        entity:
+          filter:
+            - domain:
+                - input_text
+                - input_number
+                - input_select
     keep_pending:
       name: Keep Pending
       description: If true, don't clear pending expectation after first match.
