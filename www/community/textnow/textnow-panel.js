@@ -48,17 +48,28 @@ class TextNowPanel extends LitElement {
 
   async addContact() {
     const name = this.newContact.name.trim();
-    const phone = this.newContact.phone.trim();
+    let phone = this.newContact.phone.trim();
 
     if (!name || !phone) {
       alert("Name and phone are required");
       return;
     }
 
+    // Remove +1 prefix if present for validation
+    if (phone.startsWith("+1")) {
+      phone = phone.substring(2);
+    } else if (phone.startsWith("1") && phone.length === 11) {
+      phone = phone.substring(1);
+    }
+
+    // Validate it's exactly 10 digits
     if (phone.length !== 10 || !/^\d+$/.test(phone)) {
-      alert("Phone number must be exactly 10 digits");
+      alert("Phone number must be 10 digits (with or without +1 prefix)");
       return;
     }
+
+    // Use the cleaned phone number (backend will add +1)
+    phone = phone;
 
     try {
       let contactId = `contact_${name.toLowerCase().replace(/\s+/g, "_")}`;
@@ -89,17 +100,28 @@ class TextNowPanel extends LitElement {
 
   async updateContact(contactId) {
     const name = this.editingContact.name.trim();
-    const phone = this.editingContact.phone.trim();
+    let phone = this.editingContact.phone.trim();
 
     if (!name || !phone) {
       alert("Name and phone are required");
       return;
     }
 
+    // Remove +1 prefix if present for validation
+    if (phone.startsWith("+1")) {
+      phone = phone.substring(2);
+    } else if (phone.startsWith("1") && phone.length === 11) {
+      phone = phone.substring(1);
+    }
+
+    // Validate it's exactly 10 digits
     if (phone.length !== 10 || !/^\d+$/.test(phone)) {
-      alert("Phone number must be exactly 10 digits");
+      alert("Phone number must be 10 digits (with or without +1 prefix)");
       return;
     }
+
+    // Use the cleaned phone number (backend will add +1)
+    phone = phone;
 
     try {
       await this.hass.callApi("POST", "textnow/config", {
@@ -218,11 +240,12 @@ class TextNowPanel extends LitElement {
                   @input=${(e) => (this.newContact.name = e.target.value)}
                 ></ha-textfield>
                 <ha-textfield
-                  label="Phone (10 digits)"
+                  label="Phone (+1 followed by 10 digits)"
                   .value=${this.newContact.phone}
                   @input=${(e) => (this.newContact.phone = e.target.value)}
-                  pattern="[0-9]*"
-                  maxlength="10"
+                  pattern="[+0-9]*"
+                  maxlength="13"
+                  helper="Enter +1XXXXXXXXXX or XXXXXXXXXX (10 digits)"
                 ></ha-textfield>
               </div>
               <mwc-button slot="primaryAction" @click=${this.addContact}>
@@ -250,11 +273,12 @@ class TextNowPanel extends LitElement {
                   @input=${(e) => (this.editingContact.name = e.target.value)}
                 ></ha-textfield>
                 <ha-textfield
-                  label="Phone (10 digits)"
+                  label="Phone (+1 followed by 10 digits)"
                   .value=${this.editingContact.phone}
                   @input=${(e) => (this.editingContact.phone = e.target.value)}
-                  pattern="[0-9]*"
-                  maxlength="10"
+                  pattern="[+0-9]*"
+                  maxlength="13"
+                  helper="Enter +1XXXXXXXXXX or XXXXXXXXXX (10 digits)"
                 ></ha-textfield>
               </div>
               <mwc-button
