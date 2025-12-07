@@ -138,14 +138,11 @@ class TextNowPanelJSView(HomeAssistantView):
         
         hass = request.app["hass"]
         
-        # Try to get panel JS file from www directory first (HACS)
+        # Get panel JS file from www directory (HACS standard location)
+        # www/community/textnow/textnow-panel.js is served by HACS at /local/community/textnow/textnow-panel.js
+        # But we serve it through our API for reliability
         www_file = os.path.join(
             os.path.dirname(__file__), "..", "..", "..", "www", "community", "textnow", "textnow-panel.js"
-        )
-        
-        # Fallback to panel directory
-        panel_file = os.path.join(
-            os.path.dirname(__file__), "panel", "panel.js"
         )
         
         # Check file existence in executor
@@ -153,9 +150,12 @@ class TextNowPanelJSView(HomeAssistantView):
             return os.path.exists(path)
         
         www_exists = await hass.async_add_executor_job(check_file, www_file)
-        panel_exists = await hass.async_add_executor_job(check_file, panel_file)
         
-        js_file = www_file if www_exists else (panel_file if panel_exists else None)
+        if not www_exists:
+            _LOGGER.error("Panel JS file not found at %s", www_file)
+            return self.json({"error": "Panel JS file not found. Please ensure www/community/textnow/textnow-panel.js exists."}, status_code=404)
+        
+        js_file = www_file
         
         if not js_file:
             return self.json({"error": "Panel JS file not found"}, status_code=404)
