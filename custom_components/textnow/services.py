@@ -1,144 +1,106 @@
-"""TextNow services."""
+"""Services for TextNow integration."""
+from __future__ import annotations
+
 import logging
-import voluptuous as vol
+from datetime import datetime
 from typing import Any
-from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.const import CONF_NAME
-from homeassistant.helpers import config_validation as cv
+
+from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
+import voluptuous as vol
 
 from .const import DOMAIN
 from .coordinator import TextNowDataUpdateCoordinator
 from .storage import TextNowStorage
-from .phone_utils import format_phone_number
 
 _LOGGER = logging.getLogger(__name__)
 
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
-        vol.Required("phone"): cv.string,
-        vol.Required("message"): cv.string,
-        vol.Optional("contact_name"): cv.string,
+        vol.Required("message"): str,
+        vol.Exclusive("phone", "recipient"): str,
+        vol.Exclusive("contact_id", "recipient"): str,
     }
 )
 
-SERVICE_CONTACT_SCHEMA = vol.Schema(
-    {
-        vol.Required("name"): cv.string,
-        vol.Required("phone"): cv.string,
-    }
-)
-
-SERVICE_DELETE_CONTACT_SCHEMA = vol.Schema(
-    {
-        vol.Required("contact_id"): cv.string,
-    }
-)
 
 
 async def async_send_message(
-    hass: HomeAssistant,
-    coordinator: TextNowDataUpdateCoordinator,
-    data: dict[str, Any],
+    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> None:
-    """Send a message via TextNow."""
-    phone = data["phone"]
-    message = data["message"]
-    
-    # Your existing send message implementation using coordinator.client
-    _LOGGER.info("Sending message to %s: %s", phone, message)
-    # await coordinator.client.send_sms(phone, message)  # Uncomment your actual client call
-
-
-async def async_add_contact(
-    hass: HomeAssistant, 
-    call: ServiceCall
-) -> None:
-    """Add a new contact."""
-    name = call.data["name"]
-    phone = call.data["phone"]
-    
-    try:
-        formatted_phone = format_phone_number(phone)
-    except ValueError:
-        _LOGGER.error("Invalid phone number: %s", phone)
+    """Handle send message service call."""
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
+    if not phone:
+        _LOGGER.error("Must provide contact_id")
         return
+
+    message = data.get("message", "")
+    if not message:
+        _LOGGER.error("Message is required")
+        return
+
+    try:
+        await coordinator.send_message(phone, message)
+        _LOGGER.info("Sent SMS to %s", phone)
+
+        # Update last_outbound for sensor
+        await _update_sensor_outbound(hass, coordinator, phone)
+    except Exception as e:
+        _LOGGER.error("Failed to send message: %s", e)
+        raise
+
+
+
+
+async def _resolve_phone_from_contact(
+    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
+) -> str | None:
+    """Resolve phone number from contact_id (entity_id or contact_id)."""
+    contact_id = data.get("contact_id")
+    if not contact_id:
+        _LOGGER.error("No contact_id provided in service call")
+        return None
+
+    _LOGGER.debug("Resolving phone for contact_id: %s", contact_id)
+
+    # First, try to get phone from entity state if it's an entity_id
+    if contact_id.startswith("sensor."):
+        state = hass.states.get(contact_id)
+        if state and state.attributes.get("phone"):
+            phone = state.attributes["phone"]
+            _LOGGER.info("Resolved phone %s from entity %s", phone, contact_id)
+            return phone
+        # Extract contact_id from entity_id (sensor.textnow_contact_xxx -> contact_xxx)
+        if contact_id.startswith("sensor.textnow_"):
+            contact_id = contact_id.replace("sensor.textnow_", "")
+            _LOGGER.debug("Extracted contact_id: %s from entity_id", contact_id)
+
+    # Get phone from storage
+    storage = TextNowStorage(hass, coordinator.entry.entry_id)
+    contacts = await storage.async_get_contacts()
+    _LOGGER.debug("Available contacts: %s", list(contacts.keys()))
     
-    # Find matching entry/coordinator
-    for entry_id, coordinator in hass.data[DOMAIN].items():
-        storage = TextNowStorage(hass, entry_id)
-        contact_id = f"contact_{name.lower().replace(' ', '_')}"
-        
-        # Ensure unique ID
-        contacts = await storage.async_get_contacts()
-        counter = 1
-        original_id = contact_id
-        while contact_id in contacts:
-            contact_id = f"{original_id}_{counter}"
-            counter += 1
-        
-        await storage.async_save_contact(contact_id, name, formatted_phone)
-        
-        hass.bus.async_fire(
-            f"{DOMAIN}_contact_added",
-            {
-                "contact_id": contact_id,
-                "name": name,
-                "phone": formatted_phone,
-            }
-        )
-        _LOGGER.info("Added contact %s (%s)", name, formatted_phone)
-        break
-    else:
-        _LOGGER.warning("No TextNow coordinator found for add_contact")
+    if contact_id in contacts:
+        phone = contacts[contact_id]["phone"]
+        _LOGGER.info("Resolved phone %s from contact_id %s", phone, contact_id)
+        return phone
+
+    _LOGGER.error("Contact not found: %s (searched in %d contacts)", contact_id, len(contacts))
+    _LOGGER.error("Available contact_ids: %s", list(contacts.keys()))
+    return None
 
 
-async def async_delete_contact(
-    hass: HomeAssistant,
-    entry_id: str,
-    call: ServiceCall
+async def _update_sensor_outbound(
+    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, phone: str
 ) -> None:
-    """Delete a contact."""
-    contact_id = call.data["contact_id"]
-    
-    storage = TextNowStorage(hass, entry_id)
-    await storage.async_delete_contact(contact_id)
-    
+    """Update sensor last_outbound timestamp."""
+    # Fire event to update sensor
+    from homeassistant.util import dt as dt_util
     hass.bus.async_fire(
-        f"{DOMAIN}_contact_deleted",
-        {"contact_id": contact_id}
+        f"{DOMAIN}_message_sent",
+        {
+            "phone": phone,
+            "timestamp": dt_util.utcnow().isoformat(),
+        },
     )
-    _LOGGER.info("Deleted contact %s", contact_id)
 
-
-async def async_edit_contact(
-    hass: HomeAssistant,
-    call: ServiceCall
-) -> None:
-    """Edit a contact."""
-    contact_id = call.data.get("contact_id")
-    name = call.data["name"]
-    phone = call.data["phone"]
-    
-    try:
-        formatted_phone = format_phone_number(phone)
-    except ValueError:
-        _LOGGER.error("Invalid phone number: %s", phone)
-        return
-    
-    # Find matching entry/coordinator
-    for entry_id, coordinator in hass.data[DOMAIN].items():
-        storage = TextNowStorage(hass, entry_id)
-        await storage.async_save_contact(contact_id, name, formatted_phone)
-        
-        hass.bus.async_fire(
-            f"{DOMAIN}_contact_updated",
-            {
-                "contact_id": contact_id,
-                "name": name,
-                "phone": formatted_phone,
-            }
-        )
-        _LOGGER.info("Updated contact %s to %s (%s)", contact_id, name, formatted_phone)
-        break
-    else:
-        _LOGGER.warning("No TextNow coordinator found for edit_contact")
