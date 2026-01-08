@@ -115,7 +115,7 @@ async def async_edit_contact(
     call: ServiceCall
 ) -> None:
     """Edit a contact."""
-    contact_id = call.data["contact_id"]
+    contact_id = call.data.get("contact_id")
     name = call.data["name"]
     phone = call.data["phone"]
     
