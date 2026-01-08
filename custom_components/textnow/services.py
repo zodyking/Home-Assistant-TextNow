@@ -3,6 +3,9 @@ import logging
 import voluptuous as vol
 from typing import Any
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.const import CONF_NAME
+from homeassistant.helpers import config_validation as cv
+
 from .const import DOMAIN
 from .coordinator import TextNowDataUpdateCoordinator
 from .storage import TextNowStorage
@@ -12,16 +15,22 @@ _LOGGER = logging.getLogger(__name__)
 
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
-        vol.Required("phone"): str,
-        vol.Required("message"): str,
-        vol.Optional("contact_name"): str,
+        vol.Required("phone"): cv.string,
+        vol.Required("message"): cv.string,
+        vol.Optional("contact_name"): cv.string,
     }
 )
 
 SERVICE_CONTACT_SCHEMA = vol.Schema(
     {
-        vol.Required("name"): str,
-        vol.Required("phone"): str,
+        vol.Required("name"): cv.string,
+        vol.Required("phone"): cv.string,
+    }
+)
+
+SERVICE_DELETE_CONTACT_SCHEMA = vol.Schema(
+    {
+        vol.Required("contact_id"): cv.string,
     }
 )
 
@@ -32,14 +41,12 @@ async def async_send_message(
     data: dict[str, Any],
 ) -> None:
     """Send a message via TextNow."""
-    # Your existing send message implementation
-    # Uses coordinator.client to send
     phone = data["phone"]
     message = data["message"]
-    _LOGGER.info("Sending message to %s: %s", phone, message)
     
-    # Example - replace with your actual client.send_sms() call
-    # await coordinator.client.send_sms(phone, message)
+    # Your existing send message implementation using coordinator.client
+    _LOGGER.info("Sending message to %s: %s", phone, message)
+    # await coordinator.client.send_sms(phone, message)  # Uncomment your actual client call
 
 
 async def async_add_contact(
@@ -56,7 +63,7 @@ async def async_add_contact(
         _LOGGER.error("Invalid phone number: %s", phone)
         return
     
-    # Find coordinator from entry_id (passed via service context or lookup)
+    # Find matching entry/coordinator
     for entry_id, coordinator in hass.data[DOMAIN].items():
         storage = TextNowStorage(hass, entry_id)
         contact_id = f"contact_{name.lower().replace(' ', '_')}"
@@ -81,6 +88,8 @@ async def async_add_contact(
         )
         _LOGGER.info("Added contact %s (%s)", name, formatted_phone)
         break
+    else:
+        _LOGGER.warning("No TextNow coordinator found for add_contact")
 
 
 async def async_delete_contact(
@@ -116,7 +125,7 @@ async def async_edit_contact(
         _LOGGER.error("Invalid phone number: %s", phone)
         return
     
-    # Find coordinator/entry and update
+    # Find matching entry/coordinator
     for entry_id, coordinator in hass.data[DOMAIN].items():
         storage = TextNowStorage(hass, entry_id)
         await storage.async_save_contact(contact_id, name, formatted_phone)
@@ -131,3 +140,5 @@ async def async_edit_contact(
         )
         _LOGGER.info("Updated contact %s to %s (%s)", contact_id, name, formatted_phone)
         break
+    else:
+        _LOGGER.warning("No TextNow coordinator found for edit_contact")
