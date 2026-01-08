@@ -84,7 +84,7 @@ async def async_setup_services(
         DOMAIN, "send", send_message_service, schema=SERVICE_SEND_SCHEMA
     )
 
-    # Register new contact services
+    # Register new contact services - all schemas imported from services.py
     hass.services.async_register(
         DOMAIN, "add_contact", async_add_contact, schema=SERVICE_CONTACT_SCHEMA
     )
@@ -103,29 +103,4 @@ def _register_panel(hass: HomeAssistant) -> None:
     """Register the TextNow sidebar panel."""
     if any(
         panel["url_path"] == PANEL_URL_PATH
-        for panel in hass.data.get("frontend_panels", {}).values()
-    ):
-        return
-
-    frontend.async_register_built_in_panel(
-        hass,
-        component_name="iframe",
-        sidebar_title=PANEL_TITLE,
-        sidebar_icon=PANEL_ICON,
-        frontend_url_path=PANEL_URL_PATH,
-        config={
-            "url": "/custom_components/textnow/www/textnow-panel.html",
-        },
-        require_admin=True,
-    )
-    _LOGGER.info("TextNow sidebar panel registered")
-
-
-@callback
-def _remove_panel(hass: HomeAssistant) -> None:
-    """Remove the TextNow sidebar panel."""
-    try:
-        frontend.async_remove_panel(hass, PANEL_URL_PATH)
-        _LOGGER.info("TextNow sidebar panel removed")
-    except ValueError:
-        _LOGGER.debug("TextNow panel %s not found when removing", PANEL_URL_PATH)
+        for panel in hass.data
