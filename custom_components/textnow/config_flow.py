@@ -78,7 +78,6 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        # Use a private attribute; no conflicting property
         self._config_entry = config_entry
         self.contact_id: str | None = None
         self.action_type: str | None = None
@@ -91,7 +90,7 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage the options - show menu."""
+        """Manage the options - main menu."""
         if user_input is None:
             return self.async_show_form(
                 step_id="init",
@@ -170,7 +169,7 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
     async def async_step_contacts(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Manage contacts - show menu."""
+        """Manage contacts - menu."""
         if user_input is None:
             storage = TextNowStorage(self.hass, self.config_entry.entry_id)
             contacts = await storage.async_get_contacts()
@@ -214,6 +213,71 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
         if action == "back":
             return await self.async_step_init()
         return await self.async_step_contacts()
+
+    async def async_step_add_contact(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Add a new contact."""
+        errors: dict[str, str] = {}
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="add_contact",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("name"): str,
+                        vol.Required("phone"): str,
+                    }
+                ),
+            )
+
+        # Format and validate phone number
+        try:
+            formatted_phone = format_phone_number(user_input["phone"])
+        except ValueError:
+            errors["base"] = "invalid_phone"
+            return self.async_show_form(
+                step_id="add_contact",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(
+                            "name", default=user_input.get("name", "")
+                        ): str,
+                        vol.Required(
+                            "phone", default=user_input.get("phone", "")
+                        ): str,
+                    }
+                ),
+                errors=errors,
+            )
+
+        storage = TextNowStorage(self.hass, self.config_entry.entry_id)
+        contact_id = (
+            f"contact_{user_input['name'].lower().replace(' ', '_')}"
+        )
+
+        contacts = await storage.async_get_contacts()
+        counter = 1
+        original_id = contact_id
+        while contact_id in contacts:
+            contact_id = f"{original_id}_{counter}"
+            counter += 1
+
+        await storage.async_save_contact(
+            contact_id, user_input["name"], formatted_phone
+        )
+
+        # Fire event to add sensor
+        self.hass.bus.async_fire(
+            f"{DOMAIN}_contact_added",
+            {
+                "contact_id": contact_id,
+                "name": user_input["name"],
+                "phone": formatted_phone,
+            },
+        )
+
+        return self.async_create_entry(title="", data={})
 
     async def async_step_select_contact(
         self, user_input: dict[str, Any] | None = None
@@ -270,4 +334,82 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
         contacts = await storage.async_get_contacts()
 
         if self.contact_id not in contacts:
-            return self.async_a
+            return self.async_abort(reason="contact_not_found")
+
+        contact = contacts[self.contact_id]
+        contact_name = contact.get("name", "Unknown")
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="confirm_delete",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("confirm"): bool,
+                    }
+                ),
+                description_placeholders={"name": contact_name},
+            )
+
+        if user_input.get("confirm"):
+            await storage.async_delete_contact(self.contact_id)
+            self.hass.bus.async_fire(
+                f"{DOMAIN}_contact_deleted",
+                {"contact_id": self.contact_id},
+            )
+            return self.async_create_entry(title="", data={})
+
+        return await self.async_step_contacts()
+
+    async def async_step_edit_contact(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Edit a contact."""
+        if not self.contact_id:
+            return await self.async_step_contacts()
+
+        storage = TextNowStorage(self.hass, self.config_entry.entry_id)
+        contacts = await storage.async_get_contacts()
+
+        if self.contact_id not in contacts:
+            return self.async_abort(reason="contact_not_found")
+
+        contact = contacts[self.contact_id]
+        errors: dict[str, str] = {}
+
+        if user_input is None:
+            display_phone = contact.get("phone", "").replace("+1", "")
+            return self.async_show_form(
+                step_id="edit_contact",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(
+                            "name", default=contact.get("name", "")
+                        ): str,
+                        vol.Required("phone", default=display_phone): str,
+                    }
+                ),
+            )
+
+        try:
+            formatted_phone = format_phone_number(user_input["phone"])
+        except ValueError:
+            errors["base"] = "invalid_phone"
+            display_phone = user_input.get("phone", "").replace("+1", "")
+            return self.async_show_form(
+                step_id="edit_contact",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required(
+                            "name", default=user_input.get("name", "")
+                        ): str,
+                        vol.Required("phone", default=display_phone): str,
+                    }
+                ),
+                errors=errors,
+            )
+
+        await storage.async_save_contact(
+            self.contact_id, user_input["name"], formatted_phone
+        )
+
+        return self.async_create_entry(title="", data={})
