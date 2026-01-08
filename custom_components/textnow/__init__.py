@@ -8,7 +8,6 @@ from homeassistant.components import frontend
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import storage
 
 from .const import DOMAIN
 from .coordinator import TextNowDataUpdateCoordinator
@@ -70,9 +69,10 @@ async def async_setup_services(
         async_send_message,
         SERVICE_SEND_SCHEMA,
         async_add_contact,
+        SERVICE_CONTACT_SCHEMA,
+        SERVICE_DELETE_CONTACT_SCHEMA,
         async_delete_contact,
         async_edit_contact,
-        SERVICE_CONTACT_SCHEMA
     )
 
     async def send_message_service(call):
@@ -89,8 +89,9 @@ async def async_setup_services(
         DOMAIN, "add_contact", async_add_contact, schema=SERVICE_CONTACT_SCHEMA
     )
     hass.services.async_register(
-        DOMAIN, "delete_contact", lambda call: async_delete_contact(hass, entry_id, call.data), 
-        schema=vol.Schema({vol.Required("contact_id"): str})
+        DOMAIN, "delete_contact", 
+        lambda call: async_delete_contact(hass, entry_id, call), 
+        schema=SERVICE_DELETE_CONTACT_SCHEMA
     )
     hass.services.async_register(
         DOMAIN, "edit_contact", async_edit_contact, schema=SERVICE_CONTACT_SCHEMA
