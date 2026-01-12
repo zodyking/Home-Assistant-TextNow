@@ -23,6 +23,15 @@ SERVICE_SEND_SCHEMA = vol.Schema(
     }
 )
 
+SERVICE_SEND_MMS_SCHEMA = vol.Schema(
+    {
+        vol.Optional("message", default=""): str,
+        vol.Exclusive("phone", "recipient"): str,
+        vol.Exclusive("contact_id", "recipient"): str,
+        vol.Required("file_path"): str,
+    }
+)
+
 
 
 async def async_send_message(
@@ -88,6 +97,33 @@ async def _resolve_phone_from_contact(
     _LOGGER.error("Contact not found: %s (searched in %d contacts)", contact_id, len(contacts))
     _LOGGER.error("Available contact_ids: %s", list(contacts.keys()))
     return None
+
+
+async def async_send_mms(
+    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
+) -> None:
+    """Handle send MMS service call."""
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
+    if not phone:
+        _LOGGER.error("Must provide contact_id")
+        return
+
+    file_path = data.get("file_path", "")
+    if not file_path:
+        _LOGGER.error("file_path is required")
+        return
+
+    message = data.get("message", "")
+
+    try:
+        await coordinator.send_mms(phone, message, file_path)
+        _LOGGER.info("Sent MMS to %s", phone)
+
+        # Update last_outbound for sensor
+        await _update_sensor_outbound(hass, coordinator, phone)
+    except Exception as e:
+        _LOGGER.error("Failed to send MMS: %s", e)
+        raise
 
 
 async def _update_sensor_outbound(

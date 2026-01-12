@@ -52,13 +52,20 @@ async def async_setup_services(hass: HomeAssistant, coordinator: TextNowDataUpda
     """Set up services for TextNow."""
     from .services import (
         async_send_message,
+        async_send_mms,
         SERVICE_SEND_SCHEMA,
+        SERVICE_SEND_MMS_SCHEMA,
     )
 
     async def send_message_service(call):
         """Handle send message service call."""
         await async_send_message(hass, coordinator, call.data)
 
+    async def send_mms_service(call):
+        """Handle send MMS service call."""
+        await async_send_mms(hass, coordinator, call.data)
+
     # Register service with schema for validation
     hass.services.async_register(DOMAIN, "send", send_message_service, schema=SERVICE_SEND_SCHEMA)
+    hass.services.async_register(DOMAIN, "send_mms", send_mms_service, schema=SERVICE_SEND_MMS_SCHEMA)
 
