@@ -293,8 +293,8 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("HTTP error sending message: %s", e)
             raise
 
-    async def send_mms(self, phone: str, message: str, photo_url: str, www_path: str) -> None:
-        """Send an MMS message with photo from www folder."""
+    async def send_mms(self, phone: str, message: str, file_path: str) -> None:
+        """Send an MMS message following TextNow API: get upload URL, upload file, send attachment."""
         await self._ensure_session()
         if self.session is None:
             raise Exception("Session not initialized")
@@ -303,61 +303,98 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
         from pathlib import Path
         
         # Handle /local/ URLs (Home Assistant www folder)
-        if photo_url.startswith("/local/"):
+        if file_path.startswith("/local/"):
             # Remove /local/ prefix and get filename
-            filename = photo_url.replace("/local/", "").lstrip("/")
+            filename = file_path.replace("/local/", "").lstrip("/")
+            www_path = self.hass.config.path("www")
             media_file = os.path.join(www_path, filename)
-        elif photo_url.startswith("local/"):
+        elif file_path.startswith("local/"):
             # Handle without leading slash
-            filename = photo_url.replace("local/", "").lstrip("/")
+            filename = file_path.replace("local/", "").lstrip("/")
+            www_path = self.hass.config.path("www")
             media_file = os.path.join(www_path, filename)
         else:
-            # Assume it's already a full path or relative to www
-            if os.path.isabs(photo_url):
-                media_file = photo_url
+            # Assume it's already a full path
+            if os.path.isabs(file_path):
+                media_file = file_path
             else:
-                media_file = os.path.join(www_path, photo_url)
+                # Relative to www folder
+                www_path = self.hass.config.path("www")
+                media_file = os.path.join(www_path, file_path)
         
         # Verify file exists
         if not os.path.exists(media_file):
-            raise Exception(f"Photo file not found: {media_file} (www folder: {www_path})")
+            raise Exception(f"Media file not found: {media_file}")
         
         try:
-
-            # Upload media and send MMS
-            # POST /api/users/{username}/messages with multipart/form-data
-            url = f"{self._base_url}/api/users/{self._username}/messages"
+            # Step 1: Get upload URL
+            # POST /api/v3/attachment_url
+            url = f"{self._base_url}/api/v3/attachment_url"
+            file_size = os.path.getsize(media_file)
+            file_name = os.path.basename(media_file)
             
+            payload = {
+                "file_name": file_name,
+                "file_size": file_size,
+            }
+            
+            async with self.session.post(url, json=payload) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    _LOGGER.error(
+                        "Failed to get upload URL: %s %s", response.status, error_text
+                    )
+                    raise Exception(f"Failed to get upload URL: {response.status}")
+                
+                upload_data = await response.json()
+                # Response should contain media_url
+                media_url = upload_data.get("media_url")
+                if not media_url:
+                    _LOGGER.error("No media_url in upload response: %s", upload_data)
+                    raise Exception("No media_url in upload response")
+            
+            # Step 2: Upload file to media_url
+            # PUT {media_url}
             # Determine content type from file extension
             content_type = "image/jpeg"  # default
-            if media_file.endswith((".png", ".PNG")):
+            if media_file.lower().endswith(".png"):
                 content_type = "image/png"
-            elif media_file.endswith((".gif", ".GIF")):
+            elif media_file.lower().endswith(".gif"):
                 content_type = "image/gif"
-            elif media_file.endswith((".mp4", ".MP4")):
+            elif media_file.lower().endswith(".mp4"):
                 content_type = "video/mp4"
-            elif media_file.endswith((".mp3", ".MP3", ".m4a", ".M4A")):
+            elif media_file.lower().endswith((".mp3", ".m4a")):
                 content_type = "audio/mpeg"
-
+            
             # Read file
             with open(media_file, "rb") as f:
                 file_data = f.read()
-
-            # Create multipart form data
+            
+            # Upload to media_url
+            async with self.session.put(media_url, data=file_data, headers={"Content-Type": content_type}) as response:
+                if response.status not in (200, 201, 204):
+                    error_text = await response.text()
+                    _LOGGER.error(
+                        "Failed to upload file: %s %s", response.status, error_text
+                    )
+                    raise Exception(f"Failed to upload file: {response.status}")
+            
+            # Step 3: Send attachment message
+            # POST /api/v3/send_attachment
+            # Content-Type: application/x-www-form-urlencoded
+            send_url = f"{self._base_url}/api/v3/send_attachment"
+            
             from aiohttp import FormData
-            data = FormData()
-            data.add_field("contact_value", phone)
-            data.add_field("message_direction", "2")
-            data.add_field("contact_type", "2")
-            data.add_field("message", message)
-            data.add_field(
-                "media",
-                file_data,
-                filename=os.path.basename(media_file),
-                content_type=content_type,
-            )
-
-            async with self.session.post(url, data=data) as response:
+            form_data = FormData()
+            form_data.add_field("contact_value", phone)
+            form_data.add_field("contact_type", "2")
+            form_data.add_field("attachment_url", media_url)
+            form_data.add_field("message_type", "2")
+            form_data.add_field("media_type", "images")
+            if message:
+                form_data.add_field("message", message)
+            
+            async with self.session.post(send_url, data=form_data) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     _LOGGER.error(

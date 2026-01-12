@@ -20,3 +20,33 @@ send:
       selector:
         text:
           multiline: true
+
+send_mms:
+  name: Send MMS
+  description: Send an MMS message with media attachment to a contact.
+  fields:
+    contact_id:
+      name: Contact
+      description: Select a contact to send message to.
+      required: true
+      example: "sensor.textnow_contact_1"
+      selector:
+        entity:
+          domain: sensor
+          filter:
+            - integration: textnow
+    file_path:
+      name: File
+      description: Path to media file (e.g., /local/image.jpg or full path). Use /local/ prefix for files in www folder.
+      required: true
+      example: "/local/image.jpg"
+      selector:
+        text:
+    message:
+      name: Message
+      description: Optional message text to send with the media.
+      required: false
+      example: "Check out this image"
+      selector:
+        text:
+          multiline: true
