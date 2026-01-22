@@ -1,6 +1,6 @@
-send:
+﻿send:
   name: Send Message
-  description: Send an SMS message to a contact.
+  description: Send an SMS, MMS, or voice message to a contact.
   fields:
     contact_id:
       name: Contact
@@ -14,9 +14,23 @@ send:
             - integration: textnow
     message:
       name: Message
-      description: Message text to send.
-      required: true
+      description: Message text to send (required for SMS, optional caption for MMS).
+      required: false
       example: "Hello, this is a test message"
       selector:
         text:
           multiline: true
+    mms_image:
+      name: MMS Image
+      description: Image file to send as MMS (optional).
+      required: false
+      selector:
+        file:
+          accept: "image/*"
+    voice_audio:
+      name: Voice Message
+      description: Audio file (.mp3 or .wav) to send as voice message (optional).
+      required: false
+      selector:
+        file:
+          accept: "audio/*"
