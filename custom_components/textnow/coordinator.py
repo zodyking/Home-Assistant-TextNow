@@ -403,7 +403,8 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.error(
                     "Failed to send MMS: %s %s", send_response.status, error_text
                 )
-                raise Exception(f"Failed to send MMS: {send_response.status}")
+                _LOGGER.error("Request data was: %s", send_data)
+                raise Exception(f"Failed to send MMS: {send_response.status} - {error_text[:200]}")
             
             _LOGGER.debug("MMS sent successfully to %s", phone)
             await self._update_contact_last_outbound_by_phone(phone)
@@ -482,7 +483,8 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 _LOGGER.error(
                     "Failed to send voice message: %s %s", send_response.status, error_text
                 )
-                raise Exception(f"Failed to send voice message: {send_response.status}")
+                _LOGGER.error("Request data was: %s", send_data)
+                raise Exception(f"Failed to send voice message: {send_response.status} - {error_text[:200]}")
             
             _LOGGER.debug("Voice message sent successfully to %s", phone)
             await self._update_contact_last_outbound_by_phone(phone)
