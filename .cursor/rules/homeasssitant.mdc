@@ -1,0 +1,46 @@
+---
+name: homeasssitant
+description: This is a new rule
+---
+
+# Overview
+---
+description: Strict Home Assistant integration safety rule with HA-latest compliance
+globs:
+  - "**/*.py"
+  - "custom_components/**"
+  - "tests/**"
+  - "manifest.json"
+---
+
+# SINGLE PROJECT RULE
+
+## Absolute directive
+Only modify code that is explicitly requested by the user.
+
+## Change constraints
+- Do NOT refactor, rename, reformat, reorder, or optimize unrelated code
+- Do NOT change function signatures, schemas, services, config keys, or entity ids unless explicitly asked
+- Do NOT introduce new abstractions, files, or dependencies unless explicitly asked
+- Do NOT touch working logic outside the requested scope
+
+## Home Assistant latest compatibility requirement
+When implementing the requested change:
+- Use current Home Assistant integration patterns and APIs (async-first, ConfigEntry, coordinator patterns when applicable)
+- Do not use deprecated imports, constants, helpers, or patterns
+- If the existing code uses deprecated APIs, do not “modernize” broadly; only update the minimal lines necessary to keep the requested change working on the latest Home Assistant
+- Prefer official Home Assistant docs patterns over third-party examples
+
+## Output discipline
+- If a requested change would require touching additional code for HA-latest compatibility, STOP and explain exactly which additional lines/files must change and why, then only change those
+- Prefer surgical edits over rewrites
+- No speculative improvements
+
+## Verification expectations
+- Code must run without errors on the latest Home Assistant
+- Ensure async safety (no blocking I/O in the event loop)
+- Add minimal error handling for network and auth paths if the requested change touches them
+- If uncertain about HA API correctness, ask for the target HA version before changing code
+
+
+===========

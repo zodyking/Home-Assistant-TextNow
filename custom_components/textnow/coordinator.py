@@ -322,83 +322,181 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("HTTP error sending message: %s", e)
             raise
 
-    async def send_mms(self, phone: str, message: str, photo_url: str, www_path: str) -> None:
-        """Send an MMS message with photo from www folder."""
+    async def send_mms(self, phone: str, message: str, media_file_path: str) -> None:
+        """Send an MMS message with image/media attachment.
+        
+        Uses 3-step API process:
+        1. GET upload URL from /api/v3/attachment_url?message_type=2
+        2. PUT file to pre-signed URL
+        3. POST to /api/v3/send_attachment with form data
+        """
         await self._ensure_session()
         if self.session is None:
             raise Exception("Session not initialized")
 
         import os
-        from pathlib import Path
-        
-        # Handle /local/ URLs (Home Assistant www folder)
-        if photo_url.startswith("/local/"):
-            # Remove /local/ prefix and get filename
-            filename = photo_url.replace("/local/", "").lstrip("/")
-            media_file = os.path.join(www_path, filename)
-        elif photo_url.startswith("local/"):
-            # Handle without leading slash
-            filename = photo_url.replace("local/", "").lstrip("/")
-            media_file = os.path.join(www_path, filename)
-        else:
-            # Assume it's already a full path or relative to www
-            if os.path.isabs(photo_url):
-                media_file = photo_url
-            else:
-                media_file = os.path.join(www_path, photo_url)
         
         # Verify file exists
-        if not os.path.exists(media_file):
-            raise Exception(f"Photo file not found: {media_file} (www folder: {www_path})")
+        if not os.path.exists(media_file_path):
+            raise Exception(f"Media file not found: {media_file_path}")
+        
+        # Determine content type from file extension
+        filename_lower = os.path.basename(media_file_path).lower()
+        if filename_lower.endswith('.png'):
+            content_type = 'image/png'
+        elif filename_lower.endswith('.gif'):
+            content_type = 'image/gif'
+        else:
+            content_type = 'image/jpeg'  # default for images
         
         try:
-
-            # Upload media and send MMS
-            # POST /api/users/{username}/messages with multipart/form-data
-            url = f"{self._base_url}/api/users/{self._username}/messages"
-            
-            # Determine content type from file extension
-            content_type = "image/jpeg"  # default
-            if media_file.endswith((".png", ".PNG")):
-                content_type = "image/png"
-            elif media_file.endswith((".gif", ".GIF")):
-                content_type = "image/gif"
-            elif media_file.endswith((".mp4", ".MP4")):
-                content_type = "video/mp4"
-            elif media_file.endswith((".mp3", ".MP3", ".m4a", ".M4A")):
-                content_type = "audio/mpeg"
-
-            # Read file
-            with open(media_file, "rb") as f:
-                file_data = f.read()
-
-            # Create multipart form data
-            from aiohttp import FormData
-            data = FormData()
-            data.add_field("contact_value", phone)
-            data.add_field("message_direction", "2")
-            data.add_field("contact_type", "2")
-            data.add_field("message", message)
-            data.add_field(
-                "media",
-                file_data,
-                filename=os.path.basename(media_file),
-                content_type=content_type,
+            # Step 1: Get upload URL
+            upload_url_response = await self.session.get(
+                f"{self._base_url}/api/v3/attachment_url?message_type=2"
             )
-
-            async with self.session.post(url, data=data) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    _LOGGER.error(
-                        "Failed to send MMS: %s %s", response.status, error_text
-                    )
-                    raise Exception(f"Failed to send MMS: {response.status}")
-
-                _LOGGER.debug("MMS sent successfully to %s", phone)
-                await self._update_contact_last_outbound_by_phone(phone)
+            
+            if upload_url_response.status != 200:
+                error_text = await upload_url_response.text()
+                _LOGGER.error(
+                    "Failed to get upload URL: %s %s", upload_url_response.status, error_text
+                )
+                raise Exception(f"Failed to get upload URL: {upload_url_response.status}")
+            
+            upload_data = await upload_url_response.json()
+            pre_signed_url = upload_data.get('result')
+            
+            if not pre_signed_url:
+                _LOGGER.error("No upload URL in response: %s", upload_data)
+                raise Exception("No upload URL in response")
+            
+            # Step 2: Upload file to pre-signed URL
+            with open(media_file_path, "rb") as f:
+                file_data = f.read()
+            
+            upload_response = await self.session.put(
+                pre_signed_url,
+                data=file_data,
+                headers={'Content-Type': content_type}
+            )
+            
+            if upload_response.status != 200:
+                error_text = await upload_response.text()
+                _LOGGER.error(
+                    "Failed to upload file: %s %s", upload_response.status, error_text
+                )
+                raise Exception(f"Failed to upload file: {upload_response.status}")
+            
+            # Step 3: Send message with attachment
+            from aiohttp import FormData
+            send_data = FormData()
+            send_data.add_field("contact_value", phone)
+            send_data.add_field("contact_type", "2")
+            send_data.add_field("attachment_url", pre_signed_url)
+            send_data.add_field("message_type", "2")
+            send_data.add_field("media_type", "images")
+            send_data.add_field("message", message)
+            
+            send_response = await self.session.post(
+                f"{self._base_url}/api/v3/send_attachment",
+                data=send_data
+            )
+            
+            if send_response.status != 200:
+                error_text = await send_response.text()
+                _LOGGER.error(
+                    "Failed to send MMS: %s %s", send_response.status, error_text
+                )
+                raise Exception(f"Failed to send MMS: {send_response.status}")
+            
+            _LOGGER.debug("MMS sent successfully to %s", phone)
+            await self._update_contact_last_outbound_by_phone(phone)
 
         except Exception as e:
             _LOGGER.error("Error sending MMS: %s", e)
+            raise
+    
+    async def send_voice_message(self, phone: str, audio_file_path: str) -> None:
+        """Send a voice message with audio file.
+        
+        Uses 3-step API process:
+        1. GET upload URL from /api/v3/attachment_url?message_type=3
+        2. PUT audio file to pre-signed URL
+        3. POST to /api/v3/send_attachment with form data
+        """
+        await self._ensure_session()
+        if self.session is None:
+            raise Exception("Session not initialized")
+
+        import os
+        
+        # Verify file exists
+        if not os.path.exists(audio_file_path):
+            raise Exception(f"Audio file not found: {audio_file_path}")
+        
+        try:
+            # Step 1: Get upload URL for voice message (message_type=3)
+            upload_url_response = await self.session.get(
+                f"{self._base_url}/api/v3/attachment_url?message_type=3"
+            )
+            
+            if upload_url_response.status != 200:
+                error_text = await upload_url_response.text()
+                _LOGGER.error(
+                    "Failed to get upload URL: %s %s", upload_url_response.status, error_text
+                )
+                raise Exception(f"Failed to get upload URL: {upload_url_response.status}")
+            
+            upload_data = await upload_url_response.json()
+            pre_signed_url = upload_data.get('result')
+            
+            if not pre_signed_url:
+                _LOGGER.error("No upload URL in response: %s", upload_data)
+                raise Exception("No upload URL in response")
+            
+            # Step 2: Upload audio file to pre-signed URL
+            with open(audio_file_path, "rb") as f:
+                file_data = f.read()
+            
+            upload_response = await self.session.put(
+                pre_signed_url,
+                data=file_data,
+                headers={'Content-Type': 'audio/mpeg'}
+            )
+            
+            if upload_response.status != 200:
+                error_text = await upload_response.text()
+                _LOGGER.error(
+                    "Failed to upload audio file: %s %s", upload_response.status, error_text
+                )
+                raise Exception(f"Failed to upload audio file: {upload_response.status}")
+            
+            # Step 3: Send voice message
+            from aiohttp import FormData
+            send_data = FormData()
+            send_data.add_field("contact_value", phone)
+            send_data.add_field("contact_type", "2")
+            send_data.add_field("attachment_url", pre_signed_url)
+            send_data.add_field("message_type", "3")
+            send_data.add_field("media_type", "audio")
+            send_data.add_field("message", "")  # Always empty for voice messages
+            
+            send_response = await self.session.post(
+                f"{self._base_url}/api/v3/send_attachment",
+                data=send_data
+            )
+            
+            if send_response.status != 200:
+                error_text = await send_response.text()
+                _LOGGER.error(
+                    "Failed to send voice message: %s %s", send_response.status, error_text
+                )
+                raise Exception(f"Failed to send voice message: {send_response.status}")
+            
+            _LOGGER.debug("Voice message sent successfully to %s", phone)
+            await self._update_contact_last_outbound_by_phone(phone)
+
+        except Exception as e:
+            _LOGGER.error("Error sending voice message: %s", e)
             raise
 
     async def _update_contact_last_outbound_by_phone(self, phone: str) -> None:
