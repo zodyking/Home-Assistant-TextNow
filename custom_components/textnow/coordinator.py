@@ -322,26 +322,26 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("HTTP error sending message: %s", e)
             raise
 
-    async def send_mms(self, phone: str, message: str, media_file_path: str) -> None:
+    async def send_mms(self, phone: str, message: str, file_data: bytes, filename: str = "image.jpg") -> None:
         """Send an MMS message with image/media attachment.
         
         Uses 3-step API process:
         1. GET upload URL from /api/v3/attachment_url?message_type=2
         2. PUT file to pre-signed URL
         3. POST to /api/v3/send_attachment with form data
+        
+        Args:
+            phone: Phone number to send to
+            message: Caption text (optional)
+            file_data: File data as bytes
+            filename: Filename for content type detection (default: "image.jpg")
         """
         await self._ensure_session()
         if self.session is None:
             raise Exception("Session not initialized")
-
-        import os
-        
-        # Verify file exists
-        if not os.path.exists(media_file_path):
-            raise Exception(f"Media file not found: {media_file_path}")
         
         # Determine content type from file extension
-        filename_lower = os.path.basename(media_file_path).lower()
+        filename_lower = filename.lower()
         if filename_lower.endswith('.png'):
             content_type = 'image/png'
         elif filename_lower.endswith('.gif'):
@@ -370,9 +370,6 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 raise Exception("No upload URL in response")
             
             # Step 2: Upload file to pre-signed URL
-            with open(media_file_path, "rb") as f:
-                file_data = f.read()
-            
             upload_response = await self.session.put(
                 pre_signed_url,
                 data=file_data,
@@ -415,23 +412,21 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Error sending MMS: %s", e)
             raise
     
-    async def send_voice_message(self, phone: str, audio_file_path: str) -> None:
+    async def send_voice_message(self, phone: str, file_data: bytes) -> None:
         """Send a voice message with audio file.
         
         Uses 3-step API process:
         1. GET upload URL from /api/v3/attachment_url?message_type=3
         2. PUT audio file to pre-signed URL
         3. POST to /api/v3/send_attachment with form data
+        
+        Args:
+            phone: Phone number to send to
+            file_data: Audio file data as bytes
         """
         await self._ensure_session()
         if self.session is None:
             raise Exception("Session not initialized")
-
-        import os
-        
-        # Verify file exists
-        if not os.path.exists(audio_file_path):
-            raise Exception(f"Audio file not found: {audio_file_path}")
         
         try:
             # Step 1: Get upload URL for voice message (message_type=3)
@@ -454,9 +449,6 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 raise Exception("No upload URL in response")
             
             # Step 2: Upload audio file to pre-signed URL
-            with open(audio_file_path, "rb") as f:
-                file_data = f.read()
-            
             upload_response = await self.session.put(
                 pre_signed_url,
                 data=file_data,

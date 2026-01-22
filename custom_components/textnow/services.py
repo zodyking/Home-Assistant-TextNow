@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 import voluptuous as vol
+import aiohttp
 
 from .const import DOMAIN
 from .coordinator import TextNowDataUpdateCoordinator
@@ -63,29 +66,146 @@ async def async_send_message(
         
         # Step 2: Send MMS second if image provided
         if send_mms:
-            media_path = _resolve_file_path(hass, mms_image)
-            if not media_path:
-                _LOGGER.error("Could not resolve MMS image path: %s", mms_image)
+            file_data = await _resolve_file_data(hass, mms_image)
+            if not file_data:
+                _LOGGER.error("Could not resolve MMS image: %s", mms_image)
                 return
+            # Extract filename for content type detection
+            filename = os.path.basename(mms_image) if mms_image else "image.jpg"
             # Use message as caption if provided, otherwise empty string
             caption = message if send_sms else (message or "")
-            await coordinator.send_mms(phone, caption, media_path)
+            await coordinator.send_mms(phone, caption, file_data, filename)
             _LOGGER.info("Sent MMS to %s", phone)
             await _update_sensor_outbound(hass, coordinator, phone)
         
         # Step 3: Send voice message last if audio provided
         if send_voice:
-            audio_path = _resolve_file_path(hass, voice_audio)
-            if not audio_path:
-                _LOGGER.error("Could not resolve voice audio path: %s", voice_audio)
+            file_data = await _resolve_file_data(hass, voice_audio)
+            if not file_data:
+                _LOGGER.error("Could not resolve voice audio: %s", voice_audio)
                 return
-            await coordinator.send_voice_message(phone, audio_path)
+            await coordinator.send_voice_message(phone, file_data)
             _LOGGER.info("Sent voice message to %s", phone)
             await _update_sensor_outbound(hass, coordinator, phone)
             
     except Exception as e:
         _LOGGER.error("Failed to send message: %s", e)
         raise
+
+
+async def _resolve_file_data(hass: HomeAssistant, file_path: str) -> bytes | None:
+    """Resolve file data from Home Assistant path or URL.
+    
+    Handles:
+    - /local/filename -> downloads from Home Assistant URL or reads from www folder
+    - /config/path -> downloads from Home Assistant URL or reads from config folder
+    - Absolute paths -> reads directly
+    - Home Assistant URLs -> downloads from URL
+    
+    Returns file data as bytes, or None if file cannot be resolved.
+    """
+    if not file_path:
+        return None
+    
+    # Normalize path separators
+    file_path = file_path.replace("\\", "/")
+    
+    # Try to resolve as local file first
+    local_path = _resolve_file_path(hass, file_path)
+    if local_path and os.path.exists(local_path):
+        _LOGGER.debug("Reading file from local path: %s", local_path)
+        try:
+            with open(local_path, "rb") as f:
+                return f.read()
+        except Exception as e:
+            _LOGGER.warning("Failed to read local file %s: %s", local_path, e)
+    
+    # If local file doesn't exist, try to download from Home Assistant URL
+    ha_url = _build_home_assistant_file_url(hass, file_path)
+    if ha_url:
+        _LOGGER.debug("Downloading file from Home Assistant URL: %s", ha_url)
+        try:
+            # Use Home Assistant's internal request helper if available
+            # Otherwise use aiohttp with proper headers
+            from homeassistant.helpers import network
+            
+            # Try to get the internal URL for local requests
+            try:
+                internal_url = hass.config.internal_url or "http://homeassistant.local:8123"
+                # If the URL is internal, we can access it directly
+                if ha_url.startswith(internal_url) or ha_url.startswith("http://homeassistant.local"):
+                    # For internal requests, use aiohttp without auth (local network)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(ha_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            if response.status == 200:
+                                file_data = await response.read()
+                                _LOGGER.debug("Successfully downloaded file from URL: %s (%d bytes)", ha_url, len(file_data))
+                                return file_data
+                            else:
+                                _LOGGER.warning("Failed to download file from URL %s: status %s", ha_url, response.status)
+                else:
+                    # For external URLs, might need authentication
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(ha_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                            if response.status == 200:
+                                file_data = await response.read()
+                                _LOGGER.debug("Successfully downloaded file from URL: %s (%d bytes)", ha_url, len(file_data))
+                                return file_data
+                            else:
+                                _LOGGER.warning("Failed to download file from URL %s: status %s", ha_url, response.status)
+            except Exception as e:
+                _LOGGER.warning("Error downloading file from URL %s: %s", ha_url, e)
+        except Exception as e:
+            _LOGGER.warning("Error downloading file from URL %s: %s", ha_url, e)
+    
+    _LOGGER.error("Could not resolve file: %s (tried local path and Home Assistant URL)", file_path)
+    return None
+
+
+def _build_home_assistant_file_url(hass: HomeAssistant, file_path: str) -> str | None:
+    """Build Home Assistant file URL from internal path.
+    
+    Converts:
+    - /local/filename -> {base_url}/local/filename (served directly)
+    - /config/path -> tries to construct URL (may need adjustment)
+    """
+    if not file_path:
+        return None
+    
+    file_path = file_path.replace("\\", "/")
+    
+    # Get Home Assistant base URL
+    try:
+        # Try to get the base URL from the config
+        base_url = str(hass.config.api.base_url) if hasattr(hass.config.api, 'base_url') and hass.config.api.base_url else None
+        if not base_url:
+            # Fallback to internal URL
+            base_url = str(hass.config.internal_url) if hass.config.internal_url else "http://homeassistant.local:8123"
+        # Remove trailing slash if present
+        base_url = base_url.rstrip("/")
+    except Exception:
+        base_url = "http://homeassistant.local:8123"
+    
+    # Handle /local/ paths - served directly
+    if file_path.startswith("/local/"):
+        filename = file_path.replace("/local/", "").lstrip("/")
+        # /local/ files are served directly
+        return f"{base_url}/local/{filename}"
+    
+    # Handle /config/ paths
+    if file_path.startswith("/config/"):
+        relative_path = file_path.replace("/config/", "").lstrip("/")
+        # Try direct file API first
+        # For Supervisor/OS installations, might need hassio_ingress format
+        # But for regular HA, try the file API
+        hassio_path = f"/homeassistant/config/{relative_path}"
+        return f"{base_url}/api/file?filename={quote(hassio_path)}"
+    
+    # If it's already a URL, return as-is
+    if file_path.startswith("http://") or file_path.startswith("https://"):
+        return file_path
+    
+    return None
 
 
 def _resolve_file_path(hass: HomeAssistant, file_path: str) -> str | None:
