@@ -5,6 +5,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import unquote
 
 import aiohttp
 
@@ -46,6 +47,7 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
         self._username = entry.data.get("username", "")
         self._connect_sid = entry.data.get("connect_sid", "")
         self._csrf = entry.data.get("csrf", "")
+        self._xsrf_token = entry.data.get("xsrf_token", "")
         self._base_url = "https://www.textnow.com"
 
         polling_interval = entry.data.get("polling_interval", 30)
@@ -67,19 +69,46 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
         except Exception as err:
             raise UpdateFailed(f"Error communicating with TextNow: {err}") from err
 
+    def _get_csrf_header_value(self) -> str:
+        """Get the correct CSRF token value for X-CSRF-Token header.
+        
+        Deterministic logic from API documentation (matching server.py):
+        1. Use XSRF-TOKEN cookie value if present
+        2. If _csrf starts with 's%3A', URL-decode it
+        3. Otherwise, use raw _csrf value
+        """
+        # First priority: Use XSRF-TOKEN cookie value if available
+        if self._xsrf_token:
+            return self._xsrf_token
+        # Fallback: If _csrf starts with 's%3A', it's URL-encoded and needs decoding
+        if self._csrf.startswith('s%3A'):
+            return unquote(self._csrf)
+        # Otherwise use _csrf as-is
+        return self._csrf
+
     async def _ensure_session(self) -> None:
         """Ensure aiohttp session is initialized."""
         if self.session is None or self.session.closed:
+            csrf_header_value = self._get_csrf_header_value()
+            cookies = {
+                "connect.sid": self._connect_sid,
+                "_csrf": self._csrf,
+            }
+            # Add XSRF-TOKEN cookie if available
+            if self._xsrf_token:
+                cookies["XSRF-TOKEN"] = self._xsrf_token
+            
             self.session = aiohttp.ClientSession(
-                cookies={
-                    "connect.sid": self._connect_sid,
-                    "_csrf": self._csrf,
-                },
+                cookies=cookies,
                 headers={
-                    "X-CSRF-Token": self._csrf,
+                    "X-CSRF-Token": csrf_header_value,
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Accept": "application/json, text/javascript, */*; q=0.01",
                     "X-Requested-With": "XMLHttpRequest",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/plain, */*",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Referer": f"{self._base_url}/messaging",
+                    "Origin": self._base_url,
                 },
             )
 

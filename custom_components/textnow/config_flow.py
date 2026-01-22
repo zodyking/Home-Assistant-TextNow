@@ -20,10 +20,38 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required("username"): str,
-        vol.Required("connect_sid"): str,
-        vol.Required("csrf"): str,
+        vol.Required("cookie_string"): str,
     }
 )
+
+
+def parse_cookie_string(cookie_string: str) -> dict[str, str]:
+    """Parse cookie string and return dict of cookies.
+    
+    Matches the logic from server.py:
+    - Split by semicolons (or newlines converted to semicolons)
+    - Find first = sign for key=value pairs
+    - Remove quotes from values if present
+    """
+    cookies = {}
+    if not cookie_string:
+        return cookies
+    
+    parts = cookie_string.replace('\n', ';').split(';')
+    
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        eq_index = part.find('=')
+        if eq_index > 0:
+            key = part[:eq_index].strip()
+            value = part[eq_index + 1:].strip()
+            if value.startswith('"') and value.endswith('"'):
+                value = value[1:-1]
+            cookies[key] = value
+    
+    return cookies
 
 
 class TextNowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -44,22 +72,36 @@ class TextNowConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if not user_input.get("username"):
             errors["base"] = "username_required"
-        elif not user_input.get("connect_sid"):
-            errors["base"] = "connect_sid_required"
-        elif not user_input.get("csrf"):
-            errors["base"] = "csrf_required"
+        elif not user_input.get("cookie_string"):
+            errors["base"] = "cookie_string_required"
+        else:
+            # Parse cookie string
+            cookie_string = user_input["cookie_string"]
+            cookies = parse_cookie_string(cookie_string)
+            
+            # Validate required cookies
+            if "connect.sid" not in cookies:
+                errors["base"] = "connect_sid_missing"
+            elif "_csrf" not in cookies:
+                errors["base"] = "csrf_missing"
+            elif "XSRF-TOKEN" not in cookies:
+                errors["base"] = "xsrf_token_missing"
 
         if errors:
             return self.async_show_form(
                 step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
             )
 
+        # Parse cookies (already validated above)
+        cookies = parse_cookie_string(user_input["cookie_string"])
+        
         return self.async_create_entry(
             title=user_input["username"],
             data={
                 "username": user_input["username"],
-                "connect_sid": user_input["connect_sid"],
-                "csrf": user_input["csrf"],
+                "connect_sid": cookies["connect.sid"],
+                "csrf": cookies["_csrf"],
+                "xsrf_token": cookies.get("XSRF-TOKEN", ""),
                 "polling_interval": DEFAULT_POLLING_INTERVAL,
             },
         )
@@ -118,12 +160,47 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Manage account settings."""
         if user_input is not None:
+            # Parse cookie string
+            cookie_string = user_input["cookie_string"]
+            cookies = parse_cookie_string(cookie_string)
+            
+            # Validate required cookies
+            errors: dict[str, str] = {}
+            if "connect.sid" not in cookies:
+                errors["base"] = "connect_sid_missing"
+            elif "_csrf" not in cookies:
+                errors["base"] = "csrf_missing"
+            elif "XSRF-TOKEN" not in cookies:
+                errors["base"] = "xsrf_token_missing"
+            
+            if errors:
+                # Reconstruct cookie string from existing values for display
+                existing_cookie_string = self._reconstruct_cookie_string()
+                schema = vol.Schema(
+                    {
+                        vol.Required(
+                            "username", default=user_input.get("username", "")
+                        ): str,
+                        vol.Required(
+                            "cookie_string", default=existing_cookie_string
+                        ): str,
+                        vol.Optional(
+                            "polling_interval",
+                            default=user_input.get(
+                                "polling_interval", DEFAULT_POLLING_INTERVAL
+                            ),
+                        ): int,
+                    }
+                )
+                return self.async_show_form(step_id="account", data_schema=schema, errors=errors)
+            
             data = dict(self.config_entry.data)
             data.update(
                 {
                     "username": user_input["username"],
-                    "connect_sid": user_input["connect_sid"],
-                    "csrf": user_input["csrf"],
+                    "connect_sid": cookies["connect.sid"],
+                    "csrf": cookies["_csrf"],
+                    "xsrf_token": cookies.get("XSRF-TOKEN", ""),
                     "polling_interval": user_input.get(
                         "polling_interval", DEFAULT_POLLING_INTERVAL
                     ),
@@ -143,17 +220,16 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
 
             return self.async_create_entry(title="", data={})
 
+        # Reconstruct cookie string from existing values for display
+        existing_cookie_string = self._reconstruct_cookie_string()
+        
         schema = vol.Schema(
             {
                 vol.Required(
                     "username", default=self.config_entry.data.get("username", "")
                 ): str,
                 vol.Required(
-                    "connect_sid",
-                    default=self.config_entry.data.get("connect_sid", ""),
-                ): str,
-                vol.Required(
-                    "csrf", default=self.config_entry.data.get("csrf", "")
+                    "cookie_string", default=existing_cookie_string
                 ): str,
                 vol.Optional(
                     "polling_interval",
@@ -165,6 +241,17 @@ class TextNowOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         return self.async_show_form(step_id="account", data_schema=schema)
+    
+    def _reconstruct_cookie_string(self) -> str:
+        """Reconstruct cookie string from stored values for display in edit form."""
+        parts = []
+        if self.config_entry.data.get("connect_sid"):
+            parts.append(f"connect.sid={self.config_entry.data['connect_sid']}")
+        if self.config_entry.data.get("csrf"):
+            parts.append(f"_csrf={self.config_entry.data['csrf']}")
+        if self.config_entry.data.get("xsrf_token"):
+            parts.append(f"XSRF-TOKEN={self.config_entry.data['xsrf_token']}")
+        return "; ".join(parts) if parts else ""
 
     async def async_step_contacts(
         self, user_input: dict[str, Any] | None = None
