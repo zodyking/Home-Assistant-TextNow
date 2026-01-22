@@ -22,15 +22,13 @@
           multiline: true
     mms_image:
       name: MMS Image
-      description: Image file to send as MMS (optional).
+      description: Image file path to send as MMS (e.g., /local/image.jpg or /config/images/photo.png).
       required: false
       selector:
-        file:
-          accept: "image/*"
+        text:
     voice_audio:
       name: Voice Message
-      description: Audio file (.mp3 or .wav) to send as voice message (optional).
+      description: Audio file path (.mp3 or .wav) to send as voice message (e.g., /local/voice.mp3 or /config/audio/recording.wav).
       required: false
       selector:
-        file:
-          accept: "audio/*"
+        text:
