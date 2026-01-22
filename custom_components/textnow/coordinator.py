@@ -393,9 +393,18 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 "message": message,
             }
             
+            # Override Content-Type for form data and ensure all headers are present
             send_response = await self.session.post(
                 f"{self._base_url}/api/v3/send_attachment",
                 data=send_data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRF-Token": self._get_csrf_header_value(),
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": f"{self._base_url}/messaging",
+                    "Origin": self._base_url,
+                },
             )
             
             if send_response.status != 200:
@@ -473,9 +482,18 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 "message": "",  # Always empty for voice messages
             }
             
+            # Override Content-Type for form data and ensure all headers are present
             send_response = await self.session.post(
                 f"{self._base_url}/api/v3/send_attachment",
                 data=send_data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRF-Token": self._get_csrf_header_value(),
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json, text/plain, */*",
+                    "Referer": f"{self._base_url}/messaging",
+                    "Origin": self._base_url,
+                },
             )
             
             if send_response.status != 200:

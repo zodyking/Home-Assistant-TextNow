@@ -112,13 +112,19 @@ async def _resolve_file_data(hass: HomeAssistant, file_path: str) -> bytes | Non
     
     # Try to resolve as local file first
     local_path = _resolve_file_path(hass, file_path)
-    if local_path and os.path.exists(local_path):
-        _LOGGER.debug("Reading file from local path: %s", local_path)
-        try:
-            with open(local_path, "rb") as f:
-                return f.read()
-        except Exception as e:
-            _LOGGER.warning("Failed to read local file %s: %s", local_path, e)
+    if local_path:
+        # Check if file exists in executor to avoid blocking
+        file_exists = await hass.async_add_executor_job(os.path.exists, local_path)
+        if file_exists:
+            _LOGGER.debug("Reading file from local path: %s", local_path)
+            try:
+                # Read file in executor to avoid blocking event loop
+                def read_file():
+                    with open(local_path, "rb") as f:
+                        return f.read()
+                return await hass.async_add_executor_job(read_file)
+            except Exception as e:
+                _LOGGER.warning("Failed to read local file %s: %s", local_path, e)
     
     # If local file doesn't exist, try to download from Home Assistant URL
     ha_url = _build_home_assistant_file_url(hass, file_path)
