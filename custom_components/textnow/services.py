@@ -99,37 +99,54 @@ def _resolve_file_path(hass: HomeAssistant, file_path: str) -> str | None:
     if not file_path:
         return None
     
+    # Normalize path separators
+    file_path = file_path.replace("\\", "/")
+    
     # Handle /local/ URLs (Home Assistant www folder)
     if file_path.startswith("/local/"):
         filename = file_path.replace("/local/", "").lstrip("/")
         www_path = hass.config.path("www")
         resolved_path = os.path.join(www_path, filename)
+        _LOGGER.debug("Resolving /local/ path: %s -> %s", file_path, resolved_path)
         if os.path.exists(resolved_path):
             return resolved_path
+        _LOGGER.warning("File not found at /local/ path: %s (checked: %s)", file_path, resolved_path)
     
     # Handle /config/ paths
     if file_path.startswith("/config/"):
-        filename = file_path.replace("/config/", "").lstrip("/")
+        # Remove /config/ prefix and normalize
+        relative_path = file_path.replace("/config/", "").lstrip("/")
         config_path = hass.config.config_dir
-        resolved_path = os.path.join(config_path, filename)
+        resolved_path = os.path.join(config_path, relative_path)
+        # Normalize path separators for the OS
+        resolved_path = os.path.normpath(resolved_path)
+        _LOGGER.debug("Resolving /config/ path: %s -> %s", file_path, resolved_path)
         if os.path.exists(resolved_path):
             return resolved_path
+        _LOGGER.warning("File not found at /config/ path: %s (checked: %s)", file_path, resolved_path)
     
     # Handle absolute paths
     if os.path.isabs(file_path):
-        if os.path.exists(file_path):
-            return file_path
+        normalized_path = os.path.normpath(file_path)
+        _LOGGER.debug("Resolving absolute path: %s -> %s", file_path, normalized_path)
+        if os.path.exists(normalized_path):
+            return normalized_path
+        _LOGGER.warning("File not found at absolute path: %s (checked: %s)", file_path, normalized_path)
     
     # Try relative to config directory
     config_path = hass.config.config_dir
-    resolved_path = os.path.join(config_path, file_path)
+    resolved_path = os.path.join(config_path, file_path.lstrip("/"))
+    resolved_path = os.path.normpath(resolved_path)
+    _LOGGER.debug("Resolving relative to config: %s -> %s", file_path, resolved_path)
     if os.path.exists(resolved_path):
         return resolved_path
     
     # Try as-is if it exists
-    if os.path.exists(file_path):
-        return file_path
+    normalized_path = os.path.normpath(file_path)
+    if os.path.exists(normalized_path):
+        return normalized_path
     
+    _LOGGER.error("Could not resolve file path: %s (tried multiple locations)", file_path)
     return None
 
 
