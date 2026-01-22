@@ -384,18 +384,18 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 raise Exception(f"Failed to upload file: {upload_response.status}")
             
             # Step 3: Send message with attachment
-            from aiohttp import FormData
-            send_data = FormData()
-            send_data.add_field("contact_value", phone)
-            send_data.add_field("contact_type", "2")
-            send_data.add_field("attachment_url", pre_signed_url)
-            send_data.add_field("message_type", "2")
-            send_data.add_field("media_type", "images")
-            send_data.add_field("message", message)
+            send_data = {
+                "contact_value": phone,
+                "contact_type": "2",
+                "attachment_url": pre_signed_url,
+                "message_type": "2",
+                "media_type": "images",
+                "message": message,
+            }
             
             send_response = await self.session.post(
                 f"{self._base_url}/api/v3/send_attachment",
-                data=send_data
+                data=send_data,
             )
             
             if send_response.status != 200:
@@ -463,18 +463,18 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 raise Exception(f"Failed to upload audio file: {upload_response.status}")
             
             # Step 3: Send voice message
-            from aiohttp import FormData
-            send_data = FormData()
-            send_data.add_field("contact_value", phone)
-            send_data.add_field("contact_type", "2")
-            send_data.add_field("attachment_url", pre_signed_url)
-            send_data.add_field("message_type", "3")
-            send_data.add_field("media_type", "audio")
-            send_data.add_field("message", "")  # Always empty for voice messages
+            send_data = {
+                "contact_value": phone,
+                "contact_type": "2",
+                "attachment_url": pre_signed_url,
+                "message_type": "3",
+                "media_type": "audio",
+                "message": "",  # Always empty for voice messages
+            }
             
             send_response = await self.session.post(
                 f"{self._base_url}/api/v3/send_attachment",
-                data=send_data
+                data=send_data,
             )
             
             if send_response.status != 200:
