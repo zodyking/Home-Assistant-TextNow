@@ -1,6 +1,7 @@
 """Services for TextNow integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -8,12 +9,20 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import quote
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
+from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 import aiohttp
 
-from .const import DOMAIN
+from .const import (
+    DOMAIN,
+    EVENT_REPLY_PARSED,
+    ATTR_PHONE,
+    ATTR_CONTACT_ID,
+    DEFAULT_MENU_TIMEOUT,
+    DEFAULT_NUMBER_FORMAT,
+)
 from .coordinator import TextNowDataUpdateCoordinator
 from .storage import TextNowStorage
 
@@ -26,6 +35,28 @@ SERVICE_SEND_SCHEMA = vol.Schema(
         vol.Exclusive("contact_id", "recipient"): str,
         vol.Optional("mms_image"): str,  # File path from file selector
         vol.Optional("voice_audio"): str,  # File path from file selector
+    }
+)
+
+SERVICE_SEND_MENU_SCHEMA = vol.Schema(
+    {
+        vol.Required("contact_id"): str,
+        vol.Optional("header", default=""): str,
+        vol.Required("options"): vol.All(cv.ensure_list, [str]),
+        vol.Optional("footer", default=""): str,
+        vol.Optional("number_format", default=DEFAULT_NUMBER_FORMAT): str,
+    }
+)
+
+SERVICE_WAIT_RESPONSE_SCHEMA = vol.Schema(
+    {
+        vol.Required("contact_id"): str,
+        vol.Optional("timeout", default=DEFAULT_MENU_TIMEOUT): vol.All(
+            vol.Coerce(int), vol.Range(min=10, max=3600)
+        ),
+        vol.Optional("response_type", default="choice"): vol.In(
+            ["choice", "text", "number", "boolean"]
+        ),
     }
 )
 
@@ -329,4 +360,163 @@ async def _update_sensor_outbound(
             "timestamp": dt_util.utcnow().isoformat(),
         },
     )
+
+
+def _build_menu_text(
+    header: str,
+    options: list[str],
+    footer: str,
+    number_format: str = DEFAULT_NUMBER_FORMAT,
+) -> str:
+    """Build formatted menu text from options.
+    
+    Args:
+        header: Text before the menu options
+        options: List of menu option strings
+        footer: Text after the menu options
+        number_format: Format string for each option (uses {n} and {option})
+    
+    Returns:
+        Formatted menu text string
+    """
+    lines = []
+    
+    if header:
+        lines.append(header)
+        lines.append("")  # Empty line after header
+    
+    for idx, option in enumerate(options, start=1):
+        formatted_option = number_format.format(n=idx, option=option)
+        lines.append(formatted_option)
+    
+    if footer:
+        lines.append("")  # Empty line before footer
+        lines.append(footer)
+    
+    return "\n".join(lines)
+
+
+async def async_send_menu(
+    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
+) -> None:
+    """Handle send menu service call.
+    
+    Builds a numbered menu from options and sends it via SMS.
+    Also registers a pending expectation for the response.
+    """
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
+    if not phone:
+        _LOGGER.error("Must provide valid contact_id for send_menu")
+        return
+
+    header = data.get("header", "")
+    options = data.get("options", [])
+    footer = data.get("footer", "")
+    number_format = data.get("number_format", DEFAULT_NUMBER_FORMAT)
+
+    if not options:
+        _LOGGER.error("Must provide at least one option for send_menu")
+        return
+
+    # Build menu text
+    menu_text = _build_menu_text(header, options, footer, number_format)
+    
+    try:
+        # Send the menu via SMS
+        await coordinator.send_message(phone, menu_text)
+        _LOGGER.info("Sent menu to %s with %d options", phone, len(options))
+        await _update_sensor_outbound(hass, coordinator, phone)
+        
+        # Register pending expectation for choice response
+        storage = TextNowStorage(hass, coordinator.entry.entry_id)
+        pending_data = {
+            "type": "choice",
+            "options": options,
+            "created_at": dt_util.utcnow().isoformat(),
+            "ttl_seconds": DEFAULT_MENU_TIMEOUT,
+        }
+        await storage.async_set_pending(phone, "menu", pending_data)
+        _LOGGER.debug("Registered menu pending expectation for %s", phone)
+        
+    except Exception as e:
+        _LOGGER.error("Failed to send menu: %s", e)
+        raise
+
+
+async def async_wait_response(
+    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
+) -> dict[str, Any]:
+    """Handle wait response service call.
+    
+    Blocks until a response is received from the contact or timeout occurs.
+    Returns response data for use with response_variable.
+    """
+    phone = await _resolve_phone_from_contact(hass, coordinator, data)
+    if not phone:
+        _LOGGER.error("Must provide valid contact_id for wait_response")
+        return {
+            "timed_out": True,
+            "error": "Invalid contact_id",
+        }
+
+    contact_id = data.get("contact_id", "")
+    timeout = data.get("timeout", DEFAULT_MENU_TIMEOUT)
+    response_type = data.get("response_type", "choice")
+
+    # Create an asyncio Future to wait on
+    response_future: asyncio.Future[dict[str, Any]] = asyncio.Future()
+    unsub_callback = None
+
+    @callback
+    def handle_reply_event(event) -> None:
+        """Handle reply parsed event."""
+        event_data = event.data
+        event_phone = event_data.get(ATTR_PHONE, "")
+        
+        # Check if this reply is for our phone
+        if event_phone != phone:
+            return
+        
+        # Build response data
+        response_data = {
+            "option": event_data.get("response_number", event_data.get("option_index", 0) + 1),
+            "option_index": event_data.get("option_index", 0),
+            "value": event_data.get("value", ""),
+            "raw_text": event_data.get("raw_text", ""),
+            "phone": event_phone,
+            "contact_id": event_data.get(ATTR_CONTACT_ID, contact_id),
+            "timed_out": False,
+            "type": event_data.get("type", response_type),
+        }
+        
+        # Resolve the future if not already done
+        if not response_future.done():
+            response_future.set_result(response_data)
+
+    # Subscribe to reply parsed events
+    unsub_callback = hass.bus.async_listen(EVENT_REPLY_PARSED, handle_reply_event)
+
+    try:
+        # Wait for response with timeout
+        result = await asyncio.wait_for(response_future, timeout=timeout)
+        _LOGGER.info("Received response from %s: option %s", phone, result.get("option"))
+        return result
+        
+    except asyncio.TimeoutError:
+        _LOGGER.info("Wait response timed out for %s after %d seconds", phone, timeout)
+        return {
+            "option": 0,
+            "option_index": -1,
+            "value": "",
+            "raw_text": "",
+            "phone": phone,
+            "contact_id": contact_id,
+            "timed_out": True,
+            "type": response_type,
+        }
+        
+    finally:
+        # Always unsubscribe from events
+        if unsub_callback:
+            unsub_callback()
 

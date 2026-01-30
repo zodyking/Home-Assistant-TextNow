@@ -33,3 +33,7 @@ ATTR_VALUE: Final = "value"
 ATTR_RAW_TEXT: Final = "raw_text"
 ATTR_OPTION_INDEX: Final = "option_index"
 
+# Menu defaults
+DEFAULT_MENU_TIMEOUT: Final = 300  # 5 minutes
+DEFAULT_NUMBER_FORMAT: Final = "{n}. {option}"
+
