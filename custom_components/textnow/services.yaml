@@ -35,7 +35,7 @@
 
 send_menu:
   name: Send Menu
-  description: Send an interactive menu with numbered options to a contact. The contact can reply with a number to select an option.
+  description: Send an interactive menu with numbered options and wait for the user's response. Use with response_variable to capture the reply for use with choose action.
   fields:
     contact_id:
       name: Contact
@@ -47,77 +47,60 @@ send_menu:
           domain: sensor
           filter:
             - integration: textnow
-    header:
-      name: Header Text
-      description: Text to display before the menu options (optional).
-      required: false
-      example: "Home Control Menu"
-      selector:
-        text:
-          multiline: false
     options:
       name: Menu Options
-      description: List of menu options. Users can reply with the option number (1, 2, 3, etc.) to select.
+      description: Enter one option per line. Users reply with the option number (1, 2, 3, etc.) to select.
       required: true
-      example: "['Turn on lights', 'Turn off lights', 'Lock doors']"
+      example: "Turn on lights\nTurn off lights\nLock doors"
       selector:
-        object:
-    footer:
-      name: Footer Text
-      description: Text to display after the menu options (optional).
+        text:
+          multiline: true
+    include_header:
+      name: Include Header
+      description: Show header text before the menu options.
       required: false
-      example: "Reply with a number to select"
+      default: true
+      selector:
+        boolean:
+    header:
+      name: Header Text
+      description: Text to display before the menu options.
+      required: false
+      default: "Please select an option:"
       selector:
         text:
           multiline: false
+    include_footer:
+      name: Include Footer
+      description: Show footer text after the menu options.
+      required: false
+      default: true
+      selector:
+        boolean:
+    footer:
+      name: Footer Text
+      description: Text to display after the menu options.
+      required: false
+      default: "Reply with the number of your choice"
+      selector:
+        text:
+          multiline: false
+    timeout:
+      name: Timeout (seconds)
+      description: Maximum time to wait for a response. Returns timed_out=true if exceeded.
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 3600
+          unit_of_measurement: seconds
+          mode: box
     number_format:
       name: Number Format
       description: Format string for menu options. Use {n} for number and {option} for text.
       required: false
       default: "{n}. {option}"
-      example: "{n}) {option}"
       selector:
         text:
           multiline: false
-
-wait_response:
-  name: Wait for Response
-  description: Wait for a response from a contact. Use with response_variable to capture the user's reply for use in automations with choose.
-  fields:
-    contact_id:
-      name: Contact
-      description: The contact to wait for a response from.
-      required: true
-      example: "sensor.textnow_contact_john"
-      selector:
-        entity:
-          domain: sensor
-          filter:
-            - integration: textnow
-    timeout:
-      name: Timeout (seconds)
-      description: Maximum time to wait for a response in seconds. Returns timed_out=true if exceeded.
-      required: false
-      default: 300
-      selector:
-        number:
-          min: 10
-          max: 3600
-          unit_of_measurement: seconds
-          mode: box
-    response_type:
-      name: Response Type
-      description: Expected type of response (choice for menu selections, text for any text, number for numeric input, boolean for yes/no).
-      required: false
-      default: "choice"
-      selector:
-        select:
-          options:
-            - label: "Choice (menu option number)"
-              value: "choice"
-            - label: "Text (any text response)"
-              value: "text"
-            - label: "Number (numeric value)"
-              value: "number"
-            - label: "Boolean (yes/no)"
-              value: "boolean"

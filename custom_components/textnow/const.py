@@ -34,6 +34,8 @@ ATTR_RAW_TEXT: Final = "raw_text"
 ATTR_OPTION_INDEX: Final = "option_index"
 
 # Menu defaults
-DEFAULT_MENU_TIMEOUT: Final = 300  # 5 minutes
+DEFAULT_MENU_TIMEOUT: Final = 30  # 30 seconds
 DEFAULT_NUMBER_FORMAT: Final = "{n}. {option}"
+DEFAULT_MENU_HEADER: Final = "Please select an option:"
+DEFAULT_MENU_FOOTER: Final = "Reply with the number of your choice"
 

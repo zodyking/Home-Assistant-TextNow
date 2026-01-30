@@ -64,11 +64,7 @@
     },
     "send_menu": {
       "name": "Send Menu",
-      "description": "Send an interactive menu with numbered options to a contact"
-    },
-    "wait_response": {
-      "name": "Wait for Response",
-      "description": "Wait for a response from a contact and return it as a response variable"
+      "description": "Send an interactive menu and wait for the user's response"
     },
     "prompt": {
       "name": "Prompt",

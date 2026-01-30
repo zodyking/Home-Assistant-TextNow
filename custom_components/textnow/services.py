@@ -22,6 +22,8 @@ from .const import (
     ATTR_CONTACT_ID,
     DEFAULT_MENU_TIMEOUT,
     DEFAULT_NUMBER_FORMAT,
+    DEFAULT_MENU_HEADER,
+    DEFAULT_MENU_FOOTER,
 )
 from .coordinator import TextNowDataUpdateCoordinator
 from .storage import TextNowStorage
@@ -41,22 +43,15 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
         vol.Required("contact_id"): str,
-        vol.Optional("header", default=""): str,
-        vol.Required("options"): vol.All(cv.ensure_list, [str]),
-        vol.Optional("footer", default=""): str,
-        vol.Optional("number_format", default=DEFAULT_NUMBER_FORMAT): str,
-    }
-)
-
-SERVICE_WAIT_RESPONSE_SCHEMA = vol.Schema(
-    {
-        vol.Required("contact_id"): str,
+        vol.Required("options"): str,  # Multiline text, one option per line
+        vol.Optional("include_header", default=True): bool,
+        vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
+        vol.Optional("include_footer", default=True): bool,
+        vol.Optional("footer", default=DEFAULT_MENU_FOOTER): str,
         vol.Optional("timeout", default=DEFAULT_MENU_TIMEOUT): vol.All(
-            vol.Coerce(int), vol.Range(min=10, max=3600)
+            vol.Coerce(int), vol.Range(min=5, max=3600)
         ),
-        vol.Optional("response_type", default="choice"): vol.In(
-            ["choice", "text", "number", "boolean"]
-        ),
+        vol.Optional("number_format", default=DEFAULT_NUMBER_FORMAT): str,
     }
 )
 
@@ -396,27 +391,49 @@ def _build_menu_text(
     return "\n".join(lines)
 
 
+def _parse_options_text(options_text: str) -> list[str]:
+    """Parse multiline options text into a list of options.
+    
+    Each non-empty line becomes an option.
+    """
+    lines = options_text.strip().split("\n")
+    return [line.strip() for line in lines if line.strip()]
+
+
 async def async_send_menu(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
-) -> None:
+) -> dict[str, Any]:
     """Handle send menu service call.
     
-    Builds a numbered menu from options and sends it via SMS.
-    Also registers a pending expectation for the response.
+    Builds a numbered menu from options, sends it via SMS, and waits for response.
+    Returns response data for use with response_variable.
     """
     phone = await _resolve_phone_from_contact(hass, coordinator, data)
     if not phone:
         _LOGGER.error("Must provide valid contact_id for send_menu")
-        return
+        return {
+            "timed_out": True,
+            "error": "Invalid contact_id",
+        }
 
-    header = data.get("header", "")
-    options = data.get("options", [])
-    footer = data.get("footer", "")
+    contact_id = data.get("contact_id", "")
+    options_text = data.get("options", "")
+    include_header = data.get("include_header", True)
+    header = data.get("header", DEFAULT_MENU_HEADER) if include_header else ""
+    include_footer = data.get("include_footer", True)
+    footer = data.get("footer", DEFAULT_MENU_FOOTER) if include_footer else ""
+    timeout = data.get("timeout", DEFAULT_MENU_TIMEOUT)
     number_format = data.get("number_format", DEFAULT_NUMBER_FORMAT)
 
+    # Parse options from multiline text
+    options = _parse_options_text(options_text)
+    
     if not options:
         _LOGGER.error("Must provide at least one option for send_menu")
-        return
+        return {
+            "timed_out": True,
+            "error": "No options provided",
+        }
 
     # Build menu text
     menu_text = _build_menu_text(header, options, footer, number_format)
@@ -433,37 +450,19 @@ async def async_send_menu(
             "type": "choice",
             "options": options,
             "created_at": dt_util.utcnow().isoformat(),
-            "ttl_seconds": DEFAULT_MENU_TIMEOUT,
+            "ttl_seconds": timeout,
         }
         await storage.async_set_pending(phone, "menu", pending_data)
         _LOGGER.debug("Registered menu pending expectation for %s", phone)
         
     except Exception as e:
         _LOGGER.error("Failed to send menu: %s", e)
-        raise
-
-
-async def async_wait_response(
-    hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
-) -> dict[str, Any]:
-    """Handle wait response service call.
-    
-    Blocks until a response is received from the contact or timeout occurs.
-    Returns response data for use with response_variable.
-    """
-    phone = await _resolve_phone_from_contact(hass, coordinator, data)
-    if not phone:
-        _LOGGER.error("Must provide valid contact_id for wait_response")
         return {
             "timed_out": True,
-            "error": "Invalid contact_id",
+            "error": str(e),
         }
 
-    contact_id = data.get("contact_id", "")
-    timeout = data.get("timeout", DEFAULT_MENU_TIMEOUT)
-    response_type = data.get("response_type", "choice")
-
-    # Create an asyncio Future to wait on
+    # Now wait for response
     response_future: asyncio.Future[dict[str, Any]] = asyncio.Future()
     unsub_callback = None
 
@@ -479,14 +478,13 @@ async def async_wait_response(
         
         # Build response data
         response_data = {
-            "option": event_data.get("response_number", event_data.get("option_index", 0) + 1),
+            "option": int(event_data.get("response_number", event_data.get("option_index", 0) + 1)),
             "option_index": event_data.get("option_index", 0),
             "value": event_data.get("value", ""),
             "raw_text": event_data.get("raw_text", ""),
             "phone": event_phone,
             "contact_id": event_data.get(ATTR_CONTACT_ID, contact_id),
             "timed_out": False,
-            "type": event_data.get("type", response_type),
         }
         
         # Resolve the future if not already done
@@ -503,7 +501,7 @@ async def async_wait_response(
         return result
         
     except asyncio.TimeoutError:
-        _LOGGER.info("Wait response timed out for %s after %d seconds", phone, timeout)
+        _LOGGER.info("Menu response timed out for %s after %d seconds", phone, timeout)
         return {
             "option": 0,
             "option_index": -1,
@@ -512,7 +510,6 @@ async def async_wait_response(
             "phone": phone,
             "contact_id": contact_id,
             "timed_out": True,
-            "type": response_type,
         }
         
     finally:

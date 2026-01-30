@@ -54,10 +54,8 @@ async def async_setup_services(hass: HomeAssistant, coordinator: TextNowDataUpda
     from .services import (
         async_send_message,
         async_send_menu,
-        async_wait_response,
         SERVICE_SEND_SCHEMA,
         SERVICE_SEND_MENU_SCHEMA,
-        SERVICE_WAIT_RESPONSE_SCHEMA,
     )
 
     async def send_message_service(call):
@@ -66,29 +64,17 @@ async def async_setup_services(hass: HomeAssistant, coordinator: TextNowDataUpda
 
     async def send_menu_service(call):
         """Handle send menu service call."""
-        await async_send_menu(hass, coordinator, call.data)
-
-    async def wait_response_service(call):
-        """Handle wait response service call."""
-        return await async_wait_response(hass, coordinator, call.data)
+        return await async_send_menu(hass, coordinator, call.data)
 
     # Register service with schema for validation
     hass.services.async_register(DOMAIN, "send", send_message_service, schema=SERVICE_SEND_SCHEMA)
     
-    # Register send_menu service
+    # Register send_menu service with response variable support
     hass.services.async_register(
         DOMAIN, 
         "send_menu", 
         send_menu_service, 
-        schema=SERVICE_SEND_MENU_SCHEMA
-    )
-    
-    # Register wait_response service with response variable support
-    hass.services.async_register(
-        DOMAIN,
-        "wait_response",
-        wait_response_service,
-        schema=SERVICE_WAIT_RESPONSE_SCHEMA,
+        schema=SERVICE_SEND_MENU_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
 
