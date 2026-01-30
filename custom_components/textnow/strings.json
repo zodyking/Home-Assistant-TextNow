@@ -81,8 +81,8 @@
   },
   "device_automation": {
     "trigger_type": {
-      "message_received": "SMS message received from {entity_name}",
-      "phrase_received": "Phrase received from {entity_name}"
+      "message_received": "SMS message received",
+      "phrase_received": "Phrase received in SMS"
     },
     "extra_fields": {
       "phrase": "Phrase to match"

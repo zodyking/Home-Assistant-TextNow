@@ -8,12 +8,11 @@ from homeassistant.components.homeassistant.triggers import event as event_trigg
 from homeassistant.const import (
     CONF_DEVICE_ID,
     CONF_DOMAIN,
-    CONF_ENTITY_ID,
     CONF_PLATFORM,
     CONF_TYPE,
 )
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
-from homeassistant.helpers import config_validation as cv, entity_registry as er
+from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
@@ -39,35 +38,35 @@ async def async_get_triggers(
     hass: HomeAssistant, device_id: str
 ) -> list[dict[str, str]]:
     """Return a list of triggers for TextNow devices."""
-    entity_registry = er.async_get(hass)
-    triggers = []
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get(device_id)
+    
+    if not device:
+        return []
+    
+    # Check if this is a TextNow device
+    is_textnow_device = any(
+        identifier[0] == DOMAIN for identifier in device.identifiers
+    )
+    
+    if not is_textnow_device:
+        return []
 
-    # Find all entities for this device
-    for entry in er.async_entries_for_device(entity_registry, device_id):
-        if entry.domain != "sensor" or not entry.entity_id.startswith("sensor.textnow_"):
-            continue
-
-        # Add message_received trigger
-        triggers.append(
-            {
-                CONF_PLATFORM: "device",
-                CONF_DEVICE_ID: device_id,
-                CONF_DOMAIN: DOMAIN,
-                CONF_ENTITY_ID: entry.entity_id,
-                CONF_TYPE: TRIGGER_TYPE_MESSAGE_RECEIVED,
-            }
-        )
-
-        # Add phrase_received trigger
-        triggers.append(
-            {
-                CONF_PLATFORM: "device",
-                CONF_DEVICE_ID: device_id,
-                CONF_DOMAIN: DOMAIN,
-                CONF_ENTITY_ID: entry.entity_id,
-                CONF_TYPE: TRIGGER_TYPE_PHRASE_RECEIVED,
-            }
-        )
+    # Return TWO triggers for the entire TextNow device (not per-contact)
+    triggers = [
+        {
+            CONF_PLATFORM: "device",
+            CONF_DEVICE_ID: device_id,
+            CONF_DOMAIN: DOMAIN,
+            CONF_TYPE: TRIGGER_TYPE_MESSAGE_RECEIVED,
+        },
+        {
+            CONF_PLATFORM: "device",
+            CONF_DEVICE_ID: device_id,
+            CONF_DOMAIN: DOMAIN,
+            CONF_TYPE: TRIGGER_TYPE_PHRASE_RECEIVED,
+        },
+    ]
 
     return triggers
 
@@ -98,26 +97,13 @@ async def async_attach_trigger(
 ) -> CALLBACK_TYPE:
     """Attach a trigger."""
     trigger_type = config[CONF_TYPE]
-    entity_id = config.get(CONF_ENTITY_ID, "")
     phrase = config.get(CONF_PHRASE, "")
 
-    # Extract contact_id from entity_id (sensor.textnow_contact_xxx -> contact_xxx)
-    contact_id = ""
-    if entity_id.startswith("sensor.textnow_"):
-        contact_id = entity_id.replace("sensor.textnow_", "")
-
-    # Build event data filter
-    event_data = {}
-    if contact_id:
-        event_data["contact_id"] = contact_id
-
-    # Create event trigger config
+    # Create event trigger config - listen to ALL messages (no contact filter)
     event_config = {
         event_trigger.CONF_PLATFORM: "event",
         event_trigger.CONF_EVENT_TYPE: EVENT_MESSAGE_RECEIVED,
     }
-    if event_data:
-        event_config[event_trigger.CONF_EVENT_DATA] = event_data
 
     # Wrap the action to filter by phrase if needed
     if trigger_type == TRIGGER_TYPE_PHRASE_RECEIVED and phrase:
