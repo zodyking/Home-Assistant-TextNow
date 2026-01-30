@@ -8,6 +8,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -87,11 +88,23 @@ class TextNowContactSensor(CoordinatorEntity, SensorEntity):
         self._last_outbound_ts = None
         self._pending = {}
         self._context = {}
+        self._entry_id = coordinator.entry.entry_id
 
         # Listen for message events
         self._unsub_message = None
         self._unsub_reply = None
         self._unsub_sent = None
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info for this sensor."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry_id)},
+            name="TextNow",
+            manufacturer="TextNow",
+            model="SMS Integration",
+            entry_type="service",
+        )
 
     @property
     def unique_id(self) -> str:
