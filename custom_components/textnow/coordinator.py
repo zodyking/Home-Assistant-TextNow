@@ -185,8 +185,11 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                 # Try to get timestamp from message, fallback to now
                 timestamp = message.get("timestamp") or message.get("date") or dt_util.utcnow().isoformat()
 
-                # Find contact_id
+                # Find contact_id and contact_name
                 contact_id = phone_to_contact.get(phone, phone)
+                contact_name = ""
+                if contact_id in contacts:
+                    contact_name = contacts[contact_id].get("name", "")
 
                 # Fire message received event
                 self.hass.bus.async_fire(
@@ -197,6 +200,7 @@ class TextNowDataUpdateCoordinator(DataUpdateCoordinator):
                         ATTR_MESSAGE_ID: message_id,
                         ATTR_TIMESTAMP: timestamp,
                         ATTR_CONTACT_ID: contact_id,
+                        "contact_name": contact_name,
                     },
                 )
 

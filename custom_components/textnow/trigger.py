@@ -75,11 +75,15 @@ async def async_attach_trigger(
             if event_data.get(ATTR_PHONE) != phone_filter:
                 return
 
-        # Build trigger data
+        # Build trigger data with variables for use in automations
         trigger_data = {
             **trigger_info["trigger_data"],
             "platform": DOMAIN,
             "type": trigger_type,
+            # Core variables for automation templates
+            "contact_name": event_data.get("contact_name", ""),
+            "message": event_data.get(ATTR_TEXT, ""),
+            # Additional context
             "phone": event_data.get(ATTR_PHONE),
             "contact_id": event_data.get(ATTR_CONTACT_ID),
             "text": event_data.get(ATTR_TEXT),
