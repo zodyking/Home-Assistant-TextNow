@@ -39,14 +39,11 @@ send_menu:
   fields:
     contact_id:
       name: Contact
-      description: Select a contact to send the menu to.
+      description: "Contact entity ID or template. Use {{ trigger.contact_id }} to reply to whoever triggered the automation."
       required: true
-      example: "sensor.textnow_contact_john"
+      example: "sensor.textnow_{{ trigger.contact_id }}"
       selector:
-        entity:
-          domain: sensor
-          filter:
-            - integration: textnow
+        text:
     options:
       name: Menu Options
       description: Enter one option per line. Users reply with the option number (1, 2, 3, etc.) to select.

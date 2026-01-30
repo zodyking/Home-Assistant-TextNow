@@ -1,22 +1,24 @@
 """Device triggers for TextNow integration."""
 from __future__ import annotations
 
+import logging
 import voluptuous as vol
 
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
-from homeassistant.components.homeassistant.triggers import event as event_trigger
 from homeassistant.const import (
     CONF_DEVICE_ID,
     CONF_DOMAIN,
     CONF_PLATFORM,
     CONF_TYPE,
 )
-from homeassistant.core import CALLBACK_TYPE, HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, Event, HassJob, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 from homeassistant.helpers.trigger import TriggerActionType, TriggerInfo
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, EVENT_MESSAGE_RECEIVED
+
+_LOGGER = logging.getLogger(__name__)
 
 # Trigger types
 TRIGGER_TYPE_MESSAGE_RECEIVED = "message_received"
@@ -97,31 +99,61 @@ async def async_attach_trigger(
 ) -> CALLBACK_TYPE:
     """Attach a trigger."""
     trigger_type = config[CONF_TYPE]
-    phrase = config.get(CONF_PHRASE, "")
+    phrase = config.get(CONF_PHRASE, "").lower().strip()
+    
+    job = HassJob(action, f"TextNow device trigger {trigger_type}")
 
-    # Create event trigger config - listen to ALL messages (no contact filter)
-    event_config = {
-        event_trigger.CONF_PLATFORM: "event",
-        event_trigger.CONF_EVENT_TYPE: EVENT_MESSAGE_RECEIVED,
-    }
+    @callback
+    def handle_event(event: Event) -> None:
+        """Handle the textnow_message_received event."""
+        event_data = event.data
+        message_text = event_data.get("text", "").lower()
+        
+        _LOGGER.debug(
+            "TextNow trigger received message: '%s' (looking for phrase: '%s')",
+            message_text,
+            phrase
+        )
+        
+        # For phrase_received, check if phrase is in message
+        if trigger_type == TRIGGER_TYPE_PHRASE_RECEIVED:
+            if not phrase:
+                _LOGGER.warning("Phrase trigger has no phrase configured")
+                return
+            if phrase not in message_text:
+                _LOGGER.debug("Phrase '%s' not found in message, skipping", phrase)
+                return
+            _LOGGER.info("Phrase '%s' matched in message!", phrase)
+        
+        # Build trigger payload with all useful data
+        trigger_payload = {
+            **trigger_info.get("trigger_data", {}),
+            "platform": "device",
+            "type": trigger_type,
+            "domain": DOMAIN,
+            # Event data for templates
+            "event": event,
+            # Direct access to common fields
+            "contact_name": event_data.get("contact_name", ""),
+            "contact_id": event_data.get("contact_id", ""),
+            "message": event_data.get("text", ""),
+            "text": event_data.get("text", ""),
+            "phone": event_data.get("phone", ""),
+        }
+        
+        if trigger_type == TRIGGER_TYPE_PHRASE_RECEIVED:
+            trigger_payload["matched_phrase"] = phrase
+        
+        hass.async_run_hass_job(job, {"trigger": trigger_payload})
 
-    # Wrap the action to filter by phrase if needed
-    if trigger_type == TRIGGER_TYPE_PHRASE_RECEIVED and phrase:
-        original_action = action
-
-        async def phrase_filtered_action(run_variables, context=None):
-            """Filter action by phrase match."""
-            trigger_data = run_variables.get("trigger", {})
-            event = trigger_data.get("event")
-            if event:
-                message_text = event.data.get("text", "").lower()
-                if phrase.lower() not in message_text:
-                    return  # Don't trigger if phrase not found
-            await original_action(run_variables, context)
-
-        action = phrase_filtered_action
-
-    return await event_trigger.async_attach_trigger(
-        hass, event_config, action, trigger_info, platform_type="device"
+    # Subscribe to the message received event
+    unsub = hass.bus.async_listen(EVENT_MESSAGE_RECEIVED, handle_event)
+    
+    _LOGGER.debug(
+        "Attached TextNow %s trigger%s",
+        trigger_type,
+        f" for phrase '{phrase}'" if phrase else ""
     )
+    
+    return unsub
 
