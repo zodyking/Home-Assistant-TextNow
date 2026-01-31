@@ -2,16 +2,9 @@
   name: Send Message
   description: Send an SMS, MMS, or voice message to a contact.
   fields:
-    select_contact:
-      name: Select Specific Contact
-      description: "Enable to choose a contact from dropdown. When disabled, auto-replies to trigger sender."
-      required: false
-      default: false
-      selector:
-        boolean:
     contact_id:
       name: Contact
-      description: "Select a contact. Only used when 'Select Specific Contact' is enabled above."
+      description: "Check to select a contact. Leave unchecked to auto-reply to trigger sender."
       required: false
       example: "sensor.textnow_contact_1"
       selector:
@@ -44,16 +37,9 @@ send_menu:
   name: Send Menu
   description: Send an interactive menu with numbered options and wait for the user's response. Use with response_variable to capture the reply for use with choose action.
   fields:
-    select_contact:
-      name: Select Specific Contact
-      description: "Enable to choose a contact from dropdown. When disabled, auto-replies to trigger sender."
-      required: false
-      default: false
-      selector:
-        boolean:
     contact_id:
       name: Contact
-      description: "Select a contact. Only used when 'Select Specific Contact' is enabled above."
+      description: "Check to select a contact. Leave unchecked to auto-reply to trigger sender."
       required: false
       example: "sensor.textnow_contact_john"
       selector:

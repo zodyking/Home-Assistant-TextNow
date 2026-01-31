@@ -33,8 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
         vol.Optional("message", default=""): str,
-        vol.Optional("select_contact", default=False): bool,  # Toggle: False=auto-reply, True=use dropdown
-        vol.Optional("contact_id"): str,  # Entity ID from dropdown
+        vol.Optional("contact_id"): str,  # Entity ID from dropdown (if empty, uses trigger sender)
         vol.Optional("phone"): str,  # Direct phone number (legacy)
         vol.Optional("mms_image"): str,  # File path from file selector
         vol.Optional("voice_audio"): str,  # File path from file selector
@@ -43,8 +42,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 
 SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
-        vol.Optional("select_contact", default=False): bool,  # Toggle: False=auto-reply, True=use dropdown
-        vol.Optional("contact_id"): str,  # Entity ID from dropdown
+        vol.Optional("contact_id"): str,  # Entity ID from dropdown (if empty, uses trigger sender)
         vol.Required("options"): str,  # Multiline text, one option per line
         vol.Optional("include_header", default=True): bool,
         vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
@@ -311,39 +309,32 @@ async def _resolve_phone_from_contact(
 ) -> str | None:
     """Resolve phone number from contact_id or last trigger contact.
     
-    When select_contact=False (default): Uses last trigger sender (auto-reply mode)
-    When select_contact=True: Uses the contact_id from dropdown
+    If contact_id is provided: Uses that contact
+    If contact_id is empty: Auto-replies to last trigger sender
     """
-    select_contact = data.get("select_contact", False)
     contact_id = data.get("contact_id")
     phone = data.get("phone")
     
-    # If select_contact is disabled (default), try to auto-reply to trigger sender
-    if not select_contact:
+    # If no contact_id provided, try to auto-reply to trigger sender
+    if not contact_id:
+        # Check for direct phone number first
+        if phone:
+            _LOGGER.debug("Using direct phone number: %s", phone)
+            return phone
+        
         # Look for last trigger contact stored by device_trigger
         last_trigger = hass.data.get(DOMAIN, {}).get("last_trigger_contact")
         if last_trigger and last_trigger.get("entity_id"):
             contact_id = last_trigger["entity_id"]
-            _LOGGER.info("Auto-reply mode: using trigger sender %s", contact_id)
-        elif not contact_id:
-            # No trigger contact and no contact_id provided
-            if phone:
-                _LOGGER.debug("Using direct phone number: %s", phone)
-                return phone
+            _LOGGER.info("Auto-reply: using trigger sender %s", contact_id)
+        else:
             _LOGGER.error(
-                "Auto-reply mode but no recent TextNow trigger found. "
-                "Enable 'Select Specific Contact' and choose a contact."
+                "No contact selected and no recent TextNow trigger found. "
+                "Check the Contact box and select a contact."
             )
             return None
     else:
-        # select_contact is True - require contact_id from dropdown
-        if not contact_id:
-            if phone:
-                _LOGGER.debug("Using direct phone number: %s", phone)
-                return phone
-            _LOGGER.error("'Select Specific Contact' enabled but no contact selected")
-            return None
-        _LOGGER.info("Manual mode: using selected contact %s", contact_id)
+        _LOGGER.info("Using selected contact: %s", contact_id)
 
     _LOGGER.debug("Resolving phone for contact_id: %s", contact_id)
 
