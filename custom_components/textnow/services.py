@@ -44,10 +44,8 @@ SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
         vol.Optional("contact_id"): str,  # Entity ID from dropdown (if empty, uses trigger sender)
         vol.Required("options"): str,  # Multiline text, one option per line
-        vol.Optional("include_header", default=True): bool,
-        vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
-        vol.Optional("include_footer", default=True): bool,
-        vol.Optional("footer", default=DEFAULT_MENU_FOOTER): str,
+        vol.Optional("header"): str,  # Header text (if provided, shown before options)
+        vol.Optional("footer"): str,  # Footer text (if provided, shown after options)
         vol.Optional("timeout", default=DEFAULT_MENU_TIMEOUT): vol.All(
             vol.Coerce(int), vol.Range(min=5, max=3600)
         ),
@@ -441,10 +439,8 @@ async def async_send_menu(
 
     contact_id = data.get("contact_id", "")
     options_text = data.get("options", "")
-    include_header = data.get("include_header", True)
-    header = data.get("header", DEFAULT_MENU_HEADER) if include_header else ""
-    include_footer = data.get("include_footer", True)
-    footer = data.get("footer", DEFAULT_MENU_FOOTER) if include_footer else ""
+    header = data.get("header", "")  # Empty if not provided/checked
+    footer = data.get("footer", "")  # Empty if not provided/checked
     timeout = data.get("timeout", DEFAULT_MENU_TIMEOUT)
     number_format = data.get("number_format", DEFAULT_NUMBER_FORMAT)
 
