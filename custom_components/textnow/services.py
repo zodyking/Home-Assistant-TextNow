@@ -33,8 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
         vol.Optional("message", default=""): str,
-        vol.Optional("use_trigger_contact", default=False): bool,  # Auto-reply to trigger sender
-        vol.Optional("contact_id"): str,  # Entity ID or template (rendered by HA)
+        vol.Required("contact_id"): str,  # Entity ID, "reply_to_sender", or template
         vol.Optional("phone"): str,  # Direct phone number (legacy)
         vol.Optional("mms_image"): str,  # File path from file selector
         vol.Optional("voice_audio"): str,  # File path from file selector
@@ -43,8 +42,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 
 SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
-        vol.Optional("use_trigger_contact", default=False): bool,  # Auto-reply to trigger sender
-        vol.Optional("contact_id"): str,  # Entity ID or template (rendered by HA)
+        vol.Required("contact_id"): str,  # Entity ID, "reply_to_sender", or template
         vol.Required("options"): str,  # Multiline text, one option per line
         vol.Optional("include_header", default=True): bool,
         vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
@@ -314,37 +312,34 @@ async def _resolve_phone_from_contact(
     Accepts:
     - Entity ID: sensor.textnow_brandon
     - Raw contact ID: contact_brandon
+    - Special keyword: "reply_to_sender" (converted to template)
     - Direct phone number via 'phone' field (legacy)
-    
-    When use_trigger_contact is True:
-    - Expects contact_id to contain the trigger's contact entity ID (templated in YAML)
-    - If contact_id is empty, provides helpful error message
     """
-    use_trigger_contact = data.get("use_trigger_contact", False)
     contact_id = data.get("contact_id")
     
-    # If contact_id is empty, check for alternatives
+    # If contact_id is empty, check for direct phone number
     if not contact_id or not contact_id.strip():
-        # Check for direct phone number
         phone = data.get("phone")
         if phone:
             _LOGGER.debug("Using direct phone number: %s", phone)
             return phone
-        
-        # If use_trigger_contact is enabled but no contact_id, provide helpful error
-        if use_trigger_contact:
-            _LOGGER.error(
-                "Reply to Sender enabled but no contact_id provided. "
-                "When using the visual editor with 'Reply to Sender', you must switch to YAML mode "
-                "and add: contact_id: \"sensor.textnow_{{ trigger.contact_id }}\""
-            )
-            return None
-        
         _LOGGER.error("No contact_id or phone provided in service call")
         return None
 
     contact_id = contact_id.strip()
-    _LOGGER.debug("Resolving phone for contact_id: %s (use_trigger_contact: %s)", contact_id, use_trigger_contact)
+    
+    # Check if template wasn't rendered (still contains {{ }})
+    # This happens when automation isn't triggered by a TextNow trigger
+    if "{{" in contact_id or "}}" in contact_id:
+        _LOGGER.error(
+            "contact_id contains unrendered template: %s. "
+            "When using 'Reply to Sender', make sure the automation is triggered by a TextNow trigger "
+            "(SMS Message Received or Phrase Received) that provides trigger.contact_id.",
+            contact_id
+        )
+        return None
+    
+    _LOGGER.debug("Resolving phone for contact_id: %s", contact_id)
 
     # First, try to get phone from entity state if it's an entity_id
     if contact_id.startswith("sensor."):
