@@ -20,14 +20,14 @@
 - [Installation](#installation)
 - [Initial Configuration](#initial-configuration)
 - [Managing Contacts](#managing-contacts)
-- [Services Reference](#services-reference)
+- [Services](#services)
   - [textnow.send](#textnowsend)
   - [textnow.send_menu](#textnowsend_menu)
-- [Triggers Reference](#triggers-reference)
-  - [SMS Message Received](#sms-message-received-trigger)
-  - [Phrase Received in SMS](#phrase-received-in-sms-trigger)
+- [Triggers](#triggers)
+  - [SMS Message Received](#sms-message-received)
+  - [Phrase Received in SMS](#phrase-received-in-sms)
 - [Automation Examples](#automation-examples)
-- [Template Variables Reference](#template-variables-reference)
+- [Template Variables](#template-variables)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -36,12 +36,13 @@
 
 | Feature | Description |
 |---------|-------------|
-| **Send SMS** | Send text messages to any phone number |
+| **Send SMS** | Send text messages to any contact |
 | **Send MMS** | Send images with optional captions |
 | **Send Voice Messages** | Send audio files as voice messages |
 | **Interactive Menus** | Send numbered menus, wait for response, take action |
-| **Message Triggers** | Trigger automations when ANY contact texts you |
-| **Phrase Triggers** | Trigger automations when a specific word/phrase is received |
+| **Message Triggers** | Trigger automations when any contact texts you |
+| **Phrase Triggers** | Trigger automations when a specific phrase is received |
+| **Auto-Reply** | Automatically reply to whoever triggered the automation |
 | **Contact Sensors** | Track message history per contact |
 
 ---
@@ -51,17 +52,17 @@
 ### HACS Installation (Recommended)
 
 1. Open **HACS** → **Integrations**
-2. Click the **⋮** menu → **Custom repositories**
+2. Click **⋮** menu → **Custom repositories**
 3. Enter URL: `https://github.com/zodyking/Home-Assistant-TextNow`
 4. Select Category: **Integration**
 5. Click **Add**
-6. Find "TextNow" in the list → Click **Download**
+6. Find "TextNow" → Click **Download**
 7. **Restart Home Assistant**
 
 ### Manual Installation
 
-1. Download the `custom_components/textnow` folder from this repository
-2. Copy it to your Home Assistant `config/custom_components/` directory
+1. Download the `custom_components/textnow` folder
+2. Copy to `config/custom_components/`
 3. Restart Home Assistant
 
 ---
@@ -71,37 +72,32 @@
 ### Step 1: Get Your TextNow Username
 
 1. Go to [textnow.com](https://www.textnow.com) and sign in
-2. Click on **Settings** (gear icon)
+2. Click **Settings** (gear icon)
 3. Your username is displayed on the settings page
-   - ⚠️ This is your **username**, NOT your email address
+   - ⚠️ Use your **username**, NOT your email address
 
 ### Step 2: Get Your Browser Cookies
 
-1. While logged into TextNow, press **F12** to open Developer Tools
+1. While logged into TextNow, press **F12** (Developer Tools)
 2. Click the **Network** tab
-3. Refresh the page (press F5)
-4. Click on any network request
-5. Look for the **Cookie** header in Request Headers
-6. You need these cookie values:
-   - `connect.sid` - Your session ID
-   - `_csrf` - CSRF token
-   - `XSRF-TOKEN` - XSRF token (if present)
+3. Refresh the page (F5)
+4. Click any network request
+5. Find the **Cookie** header in Request Headers
+6. Copy the entire cookie string
 
-**Tip:** You can copy the entire cookie string - the integration will parse it automatically.
+**Required cookies:** `connect.sid`, `_csrf`, `XSRF-TOKEN`
 
 ### Step 3: Add the Integration
 
 1. Go to **Settings** → **Devices & Services**
 2. Click **+ Add Integration**
 3. Search for **TextNow**
-4. Enter your username and paste your cookie string
+4. Enter username and paste cookie string
 5. Click **Submit**
 
 ---
 
 ## Managing Contacts
-
-Before you can send messages, you need to add contacts.
 
 ### Adding a Contact
 
@@ -113,39 +109,36 @@ Before you can send messages, you need to add contacts.
    - **Phone**: 10-digit phone number (e.g., "5551234567")
 5. Click **Submit**
 
-Each contact creates a sensor entity: `sensor.textnow_<name>`
-
-**Example:** Adding contact "John" creates `sensor.textnow_john`
+Each contact creates a sensor: `sensor.textnow_<name>`
 
 ---
 
-## Services Reference
+## Services
 
 ### textnow.send
 
 Send an SMS, MMS, or voice message to a contact.
 
-#### Service Fields
+![TextNow Send Message Service](images/send-message-service.png)
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `contact_id` | **Yes** | Entity | The contact sensor to send to (e.g., `sensor.textnow_john`) |
-| `message` | No* | String | Text message content |
-| `mms_image` | No* | String | File path to image for MMS |
-| `voice_audio` | No* | String | File path to audio for voice message |
+#### Fields
 
-*At least one of `message`, `mms_image`, or `voice_audio` is required.
+| Field | Required | Description |
+|-------|----------|-------------|
+| **Contact** | No | Check to select a contact. **Leave unchecked to auto-reply to trigger sender.** |
+| **Message** | No* | Text message content |
+| **Image** | No* | File path for MMS image |
+| **Audio file** | No* | File path for voice message |
 
-#### Example: Send SMS
+*At least one of Message, Image, or Audio file is required.
 
-**UI Method:**
-1. Go to **Developer Tools** → **Services**
-2. Select **TextNow: Send Message**
-3. Select contact from dropdown
-4. Enter message text
-5. Click **Call Service**
+#### Auto-Reply Feature
 
-**YAML Method:**
+When the **Contact checkbox is unchecked**, the service automatically replies to whoever triggered the automation. This works seamlessly with the TextNow triggers.
+
+#### Examples
+
+**Send to specific contact (checkbox checked):**
 ```yaml
 service: textnow.send
 data:
@@ -153,8 +146,15 @@ data:
   message: "Hello from Home Assistant!"
 ```
 
-#### Example: Send MMS (Image)
+**Auto-reply to trigger sender (checkbox unchecked):**
+```yaml
+# No contact_id needed - replies to whoever sent the triggering message
+service: textnow.send
+data:
+  message: "Got your message!"
+```
 
+**Send MMS with image:**
 ```yaml
 service: textnow.send
 data:
@@ -163,10 +163,7 @@ data:
   mms_image: /config/www/images/photo.jpg
 ```
 
-Supported image formats: `.jpg`, `.jpeg`, `.png`, `.gif`
-
-#### Example: Send Voice Message
-
+**Send voice message:**
 ```yaml
 service: textnow.send
 data:
@@ -174,38 +171,36 @@ data:
   voice_audio: /config/www/audio/message.mp3
 ```
 
-Supported audio formats: `.mp3`, `.wav`
-
 ---
 
 ### textnow.send_menu
 
-Send an interactive numbered menu and **wait for the user's response**. This service blocks until a response is received or timeout occurs.
+Send an interactive numbered menu and wait for the user's response.
 
-#### Service Fields
+![TextNow Send Menu Service](images/send-menu-service.png)
 
-| Field | Required | Default | Type | Description |
-|-------|----------|---------|------|-------------|
-| `contact_id` | **Yes** | - | String | Contact entity or template (e.g., `sensor.textnow_john` or `sensor.textnow_{{ trigger.contact_id }}`) |
-| `options` | **Yes** | - | String | Menu options, **one per line** |
-| `include_header` | No | `true` | Boolean | Show header text before options |
-| `header` | No | "Please select an option:" | String | Header text |
-| `include_footer` | No | `true` | Boolean | Show footer text after options |
-| `footer` | No | "Reply with the number of your choice" | String | Footer text |
-| `timeout` | No | `30` | Number | Seconds to wait for response (5-3600) |
-| `number_format` | No | `"{n}. {option}"` | String | Format for each option line |
+#### Fields
+
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| **Contact** | No | - | Check to select contact. Unchecked = auto-reply to trigger sender |
+| **Menu Options** | Yes | - | One option per line |
+| **Include Header** | No | On | Show header before options |
+| **Header Text** | No | "Please select an option:" | Header text |
+| **Include Footer** | No | On | Show footer after options |
+| **Footer Text** | No | "Reply with the number of your choice" | Footer text |
+| **Timeout** | No | 30 | Seconds to wait for response |
+| **Number Format** | No | "{n}. {option}" | Format for each option |
 
 #### How It Works
 
-1. Service sends the menu as an SMS
-2. Service **waits** for the user to reply
-3. User replies with a number (1, 2, 3, etc.)
-4. Service returns the response as a variable
+1. Service sends the menu as SMS
+2. Service **waits** for user to reply
+3. User replies with a number (1, 2, 3...)
+4. Service returns the response
 5. Your automation continues based on their choice
 
-#### The Menu Message
-
-When you call `send_menu`, the user receives a message like:
+#### Menu Message Example
 
 ```
 Please select an option:
@@ -219,49 +214,33 @@ Reply with the number of your choice
 
 #### Response Variable
 
-Use `response_variable` to capture the user's response:
+Use `response_variable` to capture the response:
 
 ```yaml
 service: textnow.send_menu
 data:
-  contact_id: sensor.textnow_john
   options: |
     Turn on lights
     Turn off lights
 response_variable: user_choice
 ```
 
-The `user_choice` variable contains:
+The response contains:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `option` | Integer | Selected option number (1, 2, 3...) |
-| `option_index` | Integer | Zero-based index (0, 1, 2...) |
-| `value` | String | Text of the selected option |
-| `raw_text` | String | Exact text the user sent |
-| `contact_name` | String | Name of the contact |
-| `contact_id` | String | Contact ID |
-| `phone` | String | Phone number |
-| `timed_out` | Boolean | `true` if no response before timeout |
+| Field | Description |
+|-------|-------------|
+| `option` | Selected number (1, 2, 3...) |
+| `option_index` | Zero-based index (0, 1, 2...) |
+| `value` | Text of selected option |
+| `raw_text` | What user typed |
+| `timed_out` | True if no response before timeout |
 
-#### Example: Basic Menu
+#### Examples
 
-**In the UI:**
-1. Add action → **TextNow: Send Menu**
-2. **Contact**: `sensor.textnow_john`
-3. **Menu Options**:
-   ```
-   Turn on lights
-   Turn off lights
-   Check status
-   ```
-4. Add a **Choose** action after to handle the response
-
-**In YAML:**
+**Basic menu with auto-reply:**
 ```yaml
 service: textnow.send_menu
 data:
-  contact_id: sensor.textnow_john
   options: |
     Turn on lights
     Turn off lights
@@ -270,131 +249,91 @@ data:
 response_variable: choice
 ```
 
-#### Example: Dynamic Contact (Reply to Sender)
-
-When someone texts you, reply to THEM specifically:
-
-```yaml
-service: textnow.send_menu
-data:
-  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-  options: |
-    Turn on lights
-    Turn off lights
-response_variable: choice
-```
-
-The `{{ trigger.contact_id }}` template automatically uses the contact who triggered the automation.
-
-#### Example: Custom Header and Footer
-
+**Custom header and footer:**
 ```yaml
 service: textnow.send_menu
 data:
   contact_id: sensor.textnow_john
   header: "🏠 Smart Home Control"
   options: |
-    Living room lights ON
-    Living room lights OFF
-    Bedroom lights ON
-    Bedroom lights OFF
-  footer: "Reply 1-4 to select"
-  timeout: 120
-response_variable: choice
-```
-
-#### Example: No Header/Footer
-
-```yaml
-service: textnow.send_menu
-data:
-  contact_id: sensor.textnow_john
-  include_header: false
-  include_footer: false
-  options: |
-    Yes
-    No
+    Living room ON
+    Living room OFF
+    All lights OFF
+  footer: "Reply 1-3"
 response_variable: choice
 ```
 
 ---
 
-## Triggers Reference
+## Triggers
 
-TextNow provides two trigger types that appear under **Device** triggers.
+TextNow provides two device triggers for automations.
 
-### SMS Message Received Trigger
+### SMS Message Received
 
-Fires when **any contact** sends you an SMS message.
+Fires when **any contact** sends you a message.
 
-#### Setting Up in the UI
+![SMS Message Received Trigger](images/sms-received-trigger.png)
 
-1. Create a new automation
-2. Click **+ Add Trigger**
-3. Select **Device**
-4. Search for and select **TextNow**
-5. Choose **SMS message received**
-6. Save
+#### Setup
 
-#### What This Trigger Provides
+1. Create new automation
+2. **Add Trigger** → **Device**
+3. Select **TextNow** device
+4. Choose **SMS message received**
 
-When the trigger fires, you get access to these variables:
+#### Available Variables
 
 | Variable | Description |
 |----------|-------------|
-| `{{ trigger.contact_name }}` | Name of the person who texted |
-| `{{ trigger.contact_id }}` | Contact ID (use for sending replies) |
-| `{{ trigger.message }}` | The message text |
-| `{{ trigger.text }}` | Same as message |
+| `{{ trigger.contact_name }}` | Sender's name |
+| `{{ trigger.contact_id }}` | Contact ID (for replies) |
+| `{{ trigger.message }}` | Message text |
 | `{{ trigger.phone }}` | Phone number |
 
 #### YAML Example
 
 ```yaml
 automation:
-  - alias: "Log all incoming SMS"
+  - alias: "Log incoming SMS"
     trigger:
       - platform: device
         domain: textnow
-        device_id: <your_textnow_device_id>
+        device_id: <your_device_id>
         type: message_received
     action:
       - service: logbook.log
         data:
-          name: "SMS Received"
-          message: "{{ trigger.contact_name }} said: {{ trigger.message }}"
+          name: "SMS"
+          message: "{{ trigger.contact_name }}: {{ trigger.message }}"
 ```
 
 ---
 
-### Phrase Received in SMS Trigger
+### Phrase Received in SMS
 
-Fires when a message contains a **specific phrase** you define.
+Fires when a message contains a **specific phrase**.
 
-#### Setting Up in the UI
+![Phrase Received Trigger](images/phrase-received-trigger.png)
 
-1. Create a new automation
-2. Click **+ Add Trigger**
-3. Select **Device**
-4. Search for and select **TextNow**
-5. Choose **Phrase received in SMS**
-6. Enter the phrase to match in **Phrase to match** field
-7. Save
+#### Setup
 
-#### How Phrase Matching Works
+1. Create new automation
+2. **Add Trigger** → **Device**
+3. Select **TextNow** device
+4. Choose **Phrase received in SMS**
+5. Enter the **Phrase to match**
 
-- Matching is **case-insensitive** ("LIGHTS" matches "lights")
-- Phrase can appear **anywhere** in the message
-- Message "Please turn on the lights now" matches phrase "lights"
-- Message "Turn on the lights" matches phrase "turn on"
+#### Matching Rules
 
-#### What This Trigger Provides
+- **Case-insensitive**: "LIGHTS" matches "lights"
+- **Anywhere in message**: "turn on the lights please" matches phrase "lights"
 
-Same variables as [SMS Message Received](#what-this-trigger-provides), plus:
+#### Additional Variable
 
 | Variable | Description |
 |----------|-------------|
-| `{{ trigger.matched_phrase }}` | The phrase that was matched |
+| `{{ trigger.matched_phrase }}` | The phrase that matched |
 
 #### YAML Example
 
@@ -404,7 +343,7 @@ automation:
     trigger:
       - platform: device
         domain: textnow
-        device_id: <your_textnow_device_id>
+        device_id: <your_device_id>
         type: phrase_received
         phrase: "lights on"
     action:
@@ -413,7 +352,6 @@ automation:
           entity_id: light.living_room
       - service: textnow.send
         data:
-          contact_id: "sensor.textnow_{{ trigger.contact_id }}"
           message: "Lights turned on! 💡"
 ```
 
@@ -421,9 +359,9 @@ automation:
 
 ## Automation Examples
 
-### Example 1: Interactive Light Control Menu
+### Interactive Menu Control
 
-When anyone texts the word "menu", send them a control menu and act on their response.
+When anyone texts "menu", send them a control menu:
 
 ```yaml
 automation:
@@ -434,25 +372,18 @@ automation:
         device_id: <your_device_id>
         type: phrase_received
         phrase: "menu"
-    
     action:
-      # Send menu to whoever texted
       - service: textnow.send_menu
         data:
-          contact_id: "sensor.textnow_{{ trigger.contact_id }}"
           header: "🏠 Home Control"
           options: |
             Turn on lights
             Turn off lights
             Lock doors
-            Unlock doors
-          footer: "Reply 1-4"
           timeout: 60
         response_variable: choice
       
-      # Handle their selection
       - choose:
-          # Option 1: Turn on lights
           - conditions: "{{ choice.option == 1 }}"
             sequence:
               - service: light.turn_on
@@ -460,10 +391,8 @@ automation:
                   entity_id: light.living_room
               - service: textnow.send
                 data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-                  message: "✅ Lights turned ON"
+                  message: "✅ Lights ON"
           
-          # Option 2: Turn off lights
           - conditions: "{{ choice.option == 2 }}"
             sequence:
               - service: light.turn_off
@@ -471,10 +400,8 @@ automation:
                   entity_id: light.living_room
               - service: textnow.send
                 data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-                  message: "✅ Lights turned OFF"
+                  message: "✅ Lights OFF"
           
-          # Option 3: Lock doors
           - conditions: "{{ choice.option == 3 }}"
             sequence:
               - service: lock.lock
@@ -482,111 +409,20 @@ automation:
                   entity_id: lock.front_door
               - service: textnow.send
                 data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
                   message: "🔒 Doors locked"
           
-          # Option 4: Unlock doors
-          - conditions: "{{ choice.option == 4 }}"
-            sequence:
-              - service: lock.unlock
-                target:
-                  entity_id: lock.front_door
-              - service: textnow.send
-                data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-                  message: "🔓 Doors unlocked"
-          
-          # Timeout - no response
           - conditions: "{{ choice.timed_out }}"
             sequence:
               - service: textnow.send
                 data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-                  message: "⏰ Menu timed out. Text 'menu' to try again."
+                  message: "⏰ Menu timed out"
 ```
 
-### Example 2: Simple Phrase Commands
-
-Create multiple automations for different phrases:
-
-**Lights On:**
-```yaml
-automation:
-  - alias: "SMS - Lights On"
-    trigger:
-      - platform: device
-        domain: textnow
-        device_id: <your_device_id>
-        type: phrase_received
-        phrase: "lights on"
-    action:
-      - service: light.turn_on
-        target:
-          entity_id: all
-      - service: textnow.send
-        data:
-          contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-          message: "All lights turned on! 💡"
-```
-
-**Lights Off:**
-```yaml
-automation:
-  - alias: "SMS - Lights Off"
-    trigger:
-      - platform: device
-        domain: textnow
-        device_id: <your_device_id>
-        type: phrase_received
-        phrase: "lights off"
-    action:
-      - service: light.turn_off
-        target:
-          entity_id: all
-      - service: textnow.send
-        data:
-          contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-          message: "All lights turned off! 🌙"
-```
-
-### Example 3: Security Alert with Camera Snapshot
-
-Send an MMS with a camera snapshot when motion is detected:
+### Home Status Report
 
 ```yaml
 automation:
-  - alias: "Motion Alert with Photo"
-    trigger:
-      - platform: state
-        entity_id: binary_sensor.front_door_motion
-        to: "on"
-    action:
-      # Take a snapshot
-      - service: camera.snapshot
-        target:
-          entity_id: camera.front_door
-        data:
-          filename: /config/www/motion_snapshot.jpg
-      
-      # Wait for file to save
-      - delay:
-          seconds: 2
-      
-      # Send MMS alert
-      - service: textnow.send
-        data:
-          contact_id: sensor.textnow_john
-          message: "🚨 Motion detected at front door!"
-          mms_image: /config/www/motion_snapshot.jpg
-```
-
-### Example 4: Home Status Report
-
-When someone texts "status", reply with current home status:
-
-```yaml
-automation:
-  - alias: "SMS Status Report"
+  - alias: "SMS Status"
     trigger:
       - platform: device
         domain: textnow
@@ -596,200 +432,122 @@ automation:
     action:
       - service: textnow.send
         data:
-          contact_id: "sensor.textnow_{{ trigger.contact_id }}"
           message: >
             🏠 HOME STATUS
-            
-            🌡️ Inside: {{ states('sensor.indoor_temperature') }}°F
-            🌡️ Outside: {{ states('sensor.outdoor_temperature') }}°F
+            🌡️ Inside: {{ states('sensor.indoor_temp') }}°F
             💡 Lights on: {{ states.light | selectattr('state', 'eq', 'on') | list | count }}
-            🔒 Front door: {{ states('lock.front_door') }}
-            🚗 Garage: {{ states('cover.garage_door') }}
-            👤 Home: {{ states('person.john') }}
+            🔒 Door: {{ states('lock.front_door') }}
 ```
 
-### Example 5: Yes/No Confirmation
-
-Ask for confirmation before running an action:
+### Security Alert with Photo
 
 ```yaml
 automation:
-  - alias: "Arm Security via SMS"
+  - alias: "Motion Alert"
     trigger:
-      - platform: device
-        domain: textnow
-        device_id: <your_device_id>
-        type: phrase_received
-        phrase: "arm security"
+      - platform: state
+        entity_id: binary_sensor.motion
+        to: "on"
     action:
-      # Ask for confirmation
-      - service: textnow.send_menu
+      - service: camera.snapshot
+        target:
+          entity_id: camera.front_door
         data:
-          contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-          header: "⚠️ Arm security system?"
-          options: |
-            Yes, arm now
-            No, cancel
-          include_footer: false
-          timeout: 30
-        response_variable: confirm
-      
-      - choose:
-          - conditions: "{{ confirm.option == 1 }}"
-            sequence:
-              - service: alarm_control_panel.alarm_arm_away
-                target:
-                  entity_id: alarm_control_panel.home
-              - service: textnow.send
-                data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-                  message: "🔒 Security system ARMED"
-          
-          - conditions: "{{ confirm.option == 2 or confirm.timed_out }}"
-            sequence:
-              - service: textnow.send
-                data:
-                  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-                  message: "❌ Cancelled"
+          filename: /config/www/snapshot.jpg
+      - delay: 2
+      - service: textnow.send
+        data:
+          contact_id: sensor.textnow_john
+          message: "🚨 Motion detected!"
+          mms_image: /config/www/snapshot.jpg
 ```
 
 ---
 
-## Template Variables Reference
+## Template Variables
 
-### Available in Trigger Context
-
-When using the TextNow triggers, these variables are available:
+### Trigger Variables
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `{{ trigger.contact_name }}` | "John" | Contact's name |
-| `{{ trigger.contact_id }}` | "contact_john" | Contact ID for services |
-| `{{ trigger.message }}` | "Hello there" | Message text |
-| `{{ trigger.text }}` | "Hello there" | Same as message |
+| `{{ trigger.contact_name }}` | "John" | Sender's name |
+| `{{ trigger.contact_id }}` | "contact_john" | Contact ID |
+| `{{ trigger.message }}` | "Hello" | Message text |
 | `{{ trigger.phone }}` | "+15551234567" | Phone number |
 | `{{ trigger.matched_phrase }}` | "lights on" | Matched phrase (phrase trigger only) |
 
-### Using Contact ID in Services
-
-To reply to whoever sent the message:
-
-```yaml
-service: textnow.send
-data:
-  contact_id: "sensor.textnow_{{ trigger.contact_id }}"
-  message: "Got your message!"
-```
-
-### Response Variable Fields
-
-After `send_menu` with `response_variable: choice`:
+### Response Variables (send_menu)
 
 | Variable | Example | Description |
 |----------|---------|-------------|
-| `{{ choice.option }}` | `1` | Selected option (1, 2, 3...) |
+| `{{ choice.option }}` | `1` | Selected option number |
 | `{{ choice.option_index }}` | `0` | Zero-based index |
 | `{{ choice.value }}` | "Turn on lights" | Option text |
-| `{{ choice.raw_text }}` | "1" | What user typed |
+| `{{ choice.raw_text }}` | "1" | User's reply |
 | `{{ choice.timed_out }}` | `false` | True if timeout |
-| `{{ choice.contact_name }}` | "John" | Who responded |
 
 ---
 
 ## Sensor Entities
 
-Each contact creates a sensor entity with message history.
+Each contact creates a sensor: `sensor.textnow_<contact_name>`
 
-### Entity ID Format
-
-`sensor.textnow_<contact_name>`
-
-Example: Contact "John Doe" → `sensor.textnow_john_doe`
-
-### Sensor State
-
-The sensor's state is the last received message text, or "No messages" if none.
-
-### Sensor Attributes
+### Attributes
 
 | Attribute | Description |
 |-----------|-------------|
 | `phone` | Contact's phone number |
-| `last_inbound` | Last received message text |
-| `last_inbound_ts` | Timestamp of last received message |
-| `last_outbound` | "Sent" after sending a message |
-| `last_outbound_ts` | Timestamp of last sent message |
+| `last_inbound` | Last received message |
+| `last_inbound_ts` | Timestamp of last received |
+| `last_outbound` | Last sent status |
+| `last_outbound_ts` | Timestamp of last sent |
 
 ---
 
 ## Troubleshooting
 
-### Trigger Not Firing
+### Triggers Not Firing
 
-1. **Check the phrase is in the message**: Phrase matching looks for the phrase ANYWHERE in the message (case-insensitive)
-2. **Verify the contact exists**: The sender must be a saved contact
-3. **Check allowed phones**: If you configured an allowed phones list, ensure the number is included
-4. **Enable debug logging**:
+1. Ensure sender is a saved contact
+2. Check phrase is in the message (case-insensitive)
+3. Enable debug logging:
 
 ```yaml
-# configuration.yaml
 logger:
-  default: info
   logs:
     custom_components.textnow: debug
 ```
 
-Then check **Settings → System → Logs** after sending a test message.
+### Menu Not Waiting
 
-### Menu Not Waiting for Response
-
-- Increase the `timeout` value (default is 30 seconds)
-- Check that the contact can send messages to your TextNow number
-- Verify the `send_menu` service has `response_variable` set
+- Increase `timeout` value
+- Verify `response_variable` is set
 
 ### Authentication Errors
 
-- TextNow cookies expire periodically
-- Re-copy fresh cookies from your browser
-- Make sure you're copying the cookie VALUES, not the names
+- Cookies expire periodically
+- Re-copy fresh cookies from browser
 
-### Messages Not Sending
+### Finding Device ID
 
-- Check Home Assistant logs for error details
-- Verify the contact exists in your contacts list
-- Ensure the phone number is valid (10 digits)
-
-### Finding Your Device ID
-
-For YAML triggers, you need the device ID:
-
-1. Go to **Settings → Devices & Services → TextNow**
-2. Click on the **TextNow** device
-3. Look at the URL - the device ID is in the URL
-4. Or use the UI to create the trigger first, then switch to YAML mode to see the ID
+1. Go to **Settings** → **Devices & Services** → **TextNow**
+2. Click the TextNow device
+3. Device ID is in the URL
 
 ---
 
 ## Requirements
 
-- Home Assistant 2023.7.0 or later
+- Home Assistant 2023.7.0+
 - Valid TextNow account
-- Active session cookies from browser
-
----
-
-## Security Notes
-
-- **Allowed Phones**: Restrict which phone numbers can trigger automations
-- **Cookie Security**: Session cookies provide full TextNow account access - keep them secure
-- **Local Storage**: All data is stored locally in Home Assistant
+- Active browser session cookies
 
 ---
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/zodyking/Home-Assistant-TextNow/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/zodyking/Home-Assistant-TextNow/discussions)
+- [GitHub Issues](https://github.com/zodyking/Home-Assistant-TextNow/issues)
+- [GitHub Discussions](https://github.com/zodyking/Home-Assistant-TextNow/discussions)
 
 ---
 
