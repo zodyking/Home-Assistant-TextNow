@@ -4,19 +4,10 @@
   fields:
     contact_id:
       name: Contact
-      description: Select a contact from the dropdown.
+      description: "Enter contact entity (e.g., sensor.textnow_brandon) OR leave empty to auto-reply to the trigger sender. When empty, uses: sensor.textnow_{{ trigger.contact_id }}"
       required: false
-      example: "sensor.textnow_contact_1"
-      selector:
-        entity:
-          domain: sensor
-          filter:
-            - integration: textnow
-    contact_from_trigger:
-      name: Contact from Trigger
-      description: "Use contact from trigger variable. Enter: {{ trigger.contact_id }} to reply to whoever sent the message."
-      required: false
-      example: "{{ trigger.contact_id }}"
+      default: ""
+      example: "sensor.textnow_brandon"
       selector:
         text:
     message:
@@ -46,19 +37,10 @@ send_menu:
   fields:
     contact_id:
       name: Contact
-      description: Select a contact from the dropdown.
+      description: "Enter contact entity (e.g., sensor.textnow_brandon) OR leave empty to auto-reply to the trigger sender. When empty, uses: sensor.textnow_{{ trigger.contact_id }}"
       required: false
-      example: "sensor.textnow_john"
-      selector:
-        entity:
-          domain: sensor
-          filter:
-            - integration: textnow
-    contact_from_trigger:
-      name: Contact from Trigger
-      description: "Use contact from trigger variable. Enter: {{ trigger.contact_id }} to reply to whoever sent the message."
-      required: false
-      example: "{{ trigger.contact_id }}"
+      default: ""
+      example: "sensor.textnow_brandon"
       selector:
         text:
     options:
