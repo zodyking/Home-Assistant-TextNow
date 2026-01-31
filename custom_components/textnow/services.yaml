@@ -2,14 +2,22 @@
   name: Send Message
   description: Send an SMS, MMS, or voice message to a contact.
   fields:
+    select_contact:
+      name: Select Specific Contact
+      description: "Enable to choose a contact from the dropdown. When disabled, automatically replies to whoever triggered the automation."
+      required: false
+      default: false
+      selector:
+        boolean:
     contact_id:
       name: Contact
-      description: "Enter contact entity ID (e.g., sensor.textnow_brandon) or use 'reply_to_sender' to auto-reply to whoever triggered the automation."
+      description: "Select a contact to send the message to. Only used when 'Select Specific Contact' is enabled."
       required: false
-      default: "reply_to_sender"
-      example: "sensor.textnow_brandon"
       selector:
-        text:
+        entity:
+          filter:
+            - integration: textnow
+              domain: sensor
     message:
       name: Message
       description: Message text to send (required for SMS, optional caption for MMS).
@@ -35,14 +43,22 @@ send_menu:
   name: Send Menu
   description: Send an interactive menu with numbered options and wait for the user's response. Use with response_variable to capture the reply for use with choose action.
   fields:
+    select_contact:
+      name: Select Specific Contact
+      description: "Enable to choose a contact from the dropdown. When disabled, automatically replies to whoever triggered the automation."
+      required: false
+      default: false
+      selector:
+        boolean:
     contact_id:
       name: Contact
-      description: "Enter contact entity ID (e.g., sensor.textnow_brandon) or use 'reply_to_sender' to auto-reply to whoever triggered the automation."
+      description: "Select a contact to send the menu to. Only used when 'Select Specific Contact' is enabled."
       required: false
-      default: "reply_to_sender"
-      example: "sensor.textnow_brandon"
       selector:
-        text:
+        entity:
+          filter:
+            - integration: textnow
+              domain: sensor
     options:
       name: Menu Options
       description: Enter one option per line. Users reply with the option number (1, 2, 3, etc.) to select.

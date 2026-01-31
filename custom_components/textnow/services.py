@@ -33,7 +33,8 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
         vol.Optional("message", default=""): str,
-        vol.Optional("contact_id"): str,  # Entity ID or template
+        vol.Optional("select_contact", default=False): bool,  # Toggle: False=reply to sender, True=use dropdown
+        vol.Optional("contact_id"): str,  # Entity ID from dropdown (only when select_contact=True)
         vol.Optional("phone"): str,  # Direct phone number (legacy)
         vol.Optional("mms_image"): str,  # File path from file selector
         vol.Optional("voice_audio"): str,  # File path from file selector
@@ -42,7 +43,8 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 
 SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
-        vol.Optional("contact_id"): str,  # Entity ID or template
+        vol.Optional("select_contact", default=False): bool,  # Toggle: False=reply to sender, True=use dropdown
+        vol.Optional("contact_id"): str,  # Entity ID from dropdown (only when select_contact=True)
         vol.Required("options"): str,  # Multiline text, one option per line
         vol.Optional("include_header", default=True): bool,
         vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
@@ -309,45 +311,53 @@ async def _resolve_phone_from_contact(
 ) -> str | None:
     """Resolve phone number from contact_id.
     
-    Accepts:
-    - Entity ID: sensor.textnow_brandon
-    - Raw contact ID: contact_brandon
-    - Special keyword: "reply_to_sender" (converted to template)
-    - Direct phone number via 'phone' field (legacy)
+    Behavior based on select_contact toggle:
+    - select_contact=False (default): Auto-reply to last trigger sender
+    - select_contact=True: Use the contact_id from dropdown
+    
+    Also accepts direct phone number via 'phone' field (legacy).
     """
+    select_contact = data.get("select_contact", False)
     contact_id = data.get("contact_id")
     
-    # If contact_id is empty, check for direct phone number
-    if not contact_id or not contact_id.strip():
-        phone = data.get("phone")
-        if phone:
-            _LOGGER.debug("Using direct phone number: %s", phone)
-            return phone
-        _LOGGER.error("No contact_id or phone provided in service call")
-        return None
-
-    contact_id = contact_id.strip()
-    
-    # Handle special "reply_to_sender" keyword
-    if contact_id.lower() == "reply_to_sender":
+    # If select_contact is disabled (default), use last trigger contact
+    if not select_contact:
         # Look for last trigger contact stored by device_trigger
         last_trigger = hass.data.get(DOMAIN, {}).get("last_trigger_contact")
         if last_trigger and last_trigger.get("entity_id"):
             contact_id = last_trigger["entity_id"]
-            _LOGGER.info("reply_to_sender resolved to: %s", contact_id)
+            _LOGGER.info("Auto-reply mode: using trigger sender %s", contact_id)
         else:
-            _LOGGER.error(
-                "reply_to_sender used but no recent TextNow trigger found. "
-                "Make sure the automation is triggered by a TextNow trigger "
-                "(SMS Message Received or Phrase Received)."
-            )
+            # Fallback: check if contact_id was provided anyway
+            if not contact_id or not contact_id.strip():
+                phone = data.get("phone")
+                if phone:
+                    _LOGGER.debug("Using direct phone number: %s", phone)
+                    return phone
+                _LOGGER.error(
+                    "Auto-reply mode but no recent TextNow trigger found. "
+                    "Either enable 'Select Specific Contact' and choose a contact, "
+                    "or make sure this automation is triggered by a TextNow trigger."
+                )
+                return None
+    else:
+        # select_contact is True - use the dropdown selection
+        if not contact_id or not contact_id.strip():
+            phone = data.get("phone")
+            if phone:
+                _LOGGER.debug("Using direct phone number: %s", phone)
+                return phone
+            _LOGGER.error("'Select Specific Contact' is enabled but no contact was selected")
             return None
+        _LOGGER.info("Manual mode: using selected contact %s", contact_id)
+
+    contact_id = contact_id.strip()
     
     # Check if template wasn't rendered (still contains {{ }})
     if "{{" in contact_id or "}}" in contact_id:
         _LOGGER.error(
             "contact_id contains unrendered template: %s. "
-            "Use 'reply_to_sender' or a valid contact entity ID.",
+            "Please select a contact from the dropdown.",
             contact_id
         )
         return None
