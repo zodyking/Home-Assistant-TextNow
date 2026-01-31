@@ -125,6 +125,17 @@ async def async_attach_trigger(
                 return
             _LOGGER.info("Phrase '%s' matched in message!", phrase)
         
+        # Store last trigger contact for "reply_to_sender" feature
+        contact_id = event_data.get("contact_id", "")
+        hass.data.setdefault(DOMAIN, {})
+        hass.data[DOMAIN]["last_trigger_contact"] = {
+            "contact_id": contact_id,
+            "contact_name": event_data.get("contact_name", ""),
+            "phone": event_data.get("phone", ""),
+            "entity_id": f"sensor.textnow_{contact_id}" if contact_id else "",
+        }
+        _LOGGER.debug("Stored last trigger contact: %s", hass.data[DOMAIN]["last_trigger_contact"])
+        
         # Build trigger payload with all useful data
         trigger_payload = {
             **trigger_info.get("trigger_data", {}),
@@ -135,7 +146,7 @@ async def async_attach_trigger(
             "event": event,
             # Direct access to common fields
             "contact_name": event_data.get("contact_name", ""),
-            "contact_id": event_data.get("contact_id", ""),
+            "contact_id": contact_id,
             "message": event_data.get("text", ""),
             "text": event_data.get("text", ""),
             "phone": event_data.get("phone", ""),

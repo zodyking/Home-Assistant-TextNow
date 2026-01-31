@@ -33,7 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
         vol.Optional("message", default=""): str,
-        vol.Required("contact_id"): str,  # Entity ID, "reply_to_sender", or template
+        vol.Optional("contact_id"): str,  # Entity ID or template
         vol.Optional("phone"): str,  # Direct phone number (legacy)
         vol.Optional("mms_image"): str,  # File path from file selector
         vol.Optional("voice_audio"): str,  # File path from file selector
@@ -42,7 +42,7 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 
 SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
-        vol.Required("contact_id"): str,  # Entity ID, "reply_to_sender", or template
+        vol.Optional("contact_id"): str,  # Entity ID or template
         vol.Required("options"): str,  # Multiline text, one option per line
         vol.Optional("include_header", default=True): bool,
         vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
@@ -328,13 +328,26 @@ async def _resolve_phone_from_contact(
 
     contact_id = contact_id.strip()
     
+    # Handle special "reply_to_sender" keyword
+    if contact_id.lower() == "reply_to_sender":
+        # Look for last trigger contact stored by device_trigger
+        last_trigger = hass.data.get(DOMAIN, {}).get("last_trigger_contact")
+        if last_trigger and last_trigger.get("entity_id"):
+            contact_id = last_trigger["entity_id"]
+            _LOGGER.info("reply_to_sender resolved to: %s", contact_id)
+        else:
+            _LOGGER.error(
+                "reply_to_sender used but no recent TextNow trigger found. "
+                "Make sure the automation is triggered by a TextNow trigger "
+                "(SMS Message Received or Phrase Received)."
+            )
+            return None
+    
     # Check if template wasn't rendered (still contains {{ }})
-    # This happens when automation isn't triggered by a TextNow trigger
     if "{{" in contact_id or "}}" in contact_id:
         _LOGGER.error(
             "contact_id contains unrendered template: %s. "
-            "When using 'Reply to Sender', make sure the automation is triggered by a TextNow trigger "
-            "(SMS Message Received or Phrase Received) that provides trigger.contact_id.",
+            "Use 'reply_to_sender' or a valid contact entity ID.",
             contact_id
         )
         return None

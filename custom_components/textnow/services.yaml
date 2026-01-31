@@ -4,17 +4,12 @@
   fields:
     contact_id:
       name: Contact
-      description: "Select 'Reply to Sender' to auto-reply to whoever triggered the automation, or enter a specific contact entity ID."
-      required: true
-      default: "sensor.textnow_{{ trigger.contact_id }}"
+      description: "Enter contact entity ID (e.g., sensor.textnow_brandon) or use 'reply_to_sender' to auto-reply to whoever triggered the automation."
+      required: false
+      default: "reply_to_sender"
       example: "sensor.textnow_brandon"
       selector:
-        select:
-          options:
-            - label: "Reply to Sender"
-              value: "sensor.textnow_{{ trigger.contact_id }}"
-          custom_value: true
-          sort: false
+        text:
     message:
       name: Message
       description: Message text to send (required for SMS, optional caption for MMS).
@@ -42,17 +37,12 @@ send_menu:
   fields:
     contact_id:
       name: Contact
-      description: "Select 'Reply to Sender' to auto-reply to whoever triggered the automation, or enter a specific contact entity ID."
-      required: true
-      default: "sensor.textnow_{{ trigger.contact_id }}"
+      description: "Enter contact entity ID (e.g., sensor.textnow_brandon) or use 'reply_to_sender' to auto-reply to whoever triggered the automation."
+      required: false
+      default: "reply_to_sender"
       example: "sensor.textnow_brandon"
       selector:
-        select:
-          options:
-            - label: "Reply to Sender"
-              value: "sensor.textnow_{{ trigger.contact_id }}"
-          custom_value: true
-          sort: false
+        text:
     options:
       name: Menu Options
       description: Enter one option per line. Users reply with the option number (1, 2, 3, etc.) to select.
