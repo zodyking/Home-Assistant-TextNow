@@ -139,6 +139,19 @@ class TextNowPanel extends HTMLElement {
     }
   }
 
+  _maskPhone(phone) {
+    if (!phone) return "•••••••••";
+    // Remove any non-digit characters for consistent masking
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length <= 4) {
+      return phone; // Too short to mask meaningfully
+    }
+    // Show only last 4 digits, mask the rest with bullet characters
+    const visiblePart = digits.slice(-4);
+    const maskedLength = digits.length - 4;
+    return "•".repeat(maskedLength) + visiblePart;
+  }
+
   connectedCallback() {
     this._render();
   }
@@ -552,7 +565,7 @@ class TextNowPanel extends HTMLElement {
           <div class="contact-avatar">${contact.name.charAt(0).toUpperCase()}</div>
           <div class="contact-info">
             <div class="contact-name">${contact.name}</div>
-            <div class="contact-phone">${contact.phone}</div>
+            <div class="contact-phone">${this._maskPhone(contact.phone)}</div>
           </div>
           <div class="contact-actions">
             <button class="btn btn-danger btn-icon delete-contact" data-id="${contact.id}" title="Delete">
