@@ -486,9 +486,6 @@ class TextNowPanel extends HTMLElement {
         <button class="tab ${this._activeTab === 'contacts' ? 'active' : ''}" data-tab="contacts">
           Contacts
         </button>
-        <button class="tab ${this._activeTab === 'send' ? 'active' : ''}" data-tab="send">
-          Send Message
-        </button>
         <button class="tab ${this._activeTab === 'status' ? 'active' : ''}" data-tab="status">
           Status
         </button>
@@ -501,8 +498,6 @@ class TextNowPanel extends HTMLElement {
       content = `<div class="loading"><div class="spinner"></div></div>`;
     } else if (this._activeTab === "contacts") {
       content = this._renderContactsTab();
-    } else if (this._activeTab === "send") {
-      content = this._renderSendTab();
     } else if (this._activeTab === "status") {
       content = this._renderStatusTab();
     }
@@ -560,11 +555,6 @@ class TextNowPanel extends HTMLElement {
             <div class="contact-phone">${contact.phone}</div>
           </div>
           <div class="contact-actions">
-            <button class="btn btn-secondary btn-icon send-to-contact" data-id="${contact.id}" title="Send Message">
-              <svg width="18" height="18" viewBox="0 0 24 24">
-                <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z"/>
-              </svg>
-            </button>
             <button class="btn btn-danger btn-icon delete-contact" data-id="${contact.id}" title="Delete">
               <svg width="18" height="18" viewBox="0 0 24 24">
                 <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -588,29 +578,6 @@ class TextNowPanel extends HTMLElement {
     return addForm + contactsList;
   }
 
-  _renderSendTab() {
-    const contactOptions = this._contacts.map(c => 
-      `<option value="${c.id}">${c.name} (${c.phone})</option>`
-    ).join("");
-
-    return `
-      <div class="card">
-        <h3 class="card-title">Send Message</h3>
-        <div class="form-group">
-          <label>To</label>
-          <select id="send-contact" style="width:100%; padding:10px 12px; border:1px solid var(--divider-color, #333); border-radius:4px; background:var(--secondary-background-color, #2a2a2a); color:var(--primary-text-color, #fff); font-size:14px;">
-            <option value="">Select a contact...</option>
-            ${contactOptions}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Message</label>
-          <textarea id="send-message" rows="4" placeholder="Type your message..."></textarea>
-        </div>
-        <button class="btn btn-primary" id="send-message-btn">Send Message</button>
-      </div>
-    `;
-  }
 
   _renderStatusTab() {
     const contactCount = this._contacts.length;
@@ -674,20 +641,6 @@ class TextNowPanel extends HTMLElement {
       });
     });
 
-    // Send to contact button
-    this.shadowRoot.querySelectorAll(".send-to-contact").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const contactId = e.currentTarget.dataset.id;
-        this._activeTab = "send";
-        this._render();
-        setTimeout(() => {
-          const select = this.shadowRoot.querySelector("#send-contact");
-          if (select) select.value = contactId;
-        }, 10);
-      });
-    });
-
     // Refresh contacts
     const refreshBtn = this.shadowRoot.querySelector("#refresh-contacts");
     if (refreshBtn) {
@@ -700,28 +653,6 @@ class TextNowPanel extends HTMLElement {
       refreshAllBtn.addEventListener("click", () => this._loadContacts());
     }
 
-    // Send message
-    const sendBtn = this.shadowRoot.querySelector("#send-message-btn");
-    if (sendBtn) {
-      sendBtn.addEventListener("click", async () => {
-        const contactId = this.shadowRoot.querySelector("#send-contact").value;
-        const message = this.shadowRoot.querySelector("#send-message").value;
-        
-        if (!contactId) {
-          this._showToast("Please select a contact", true);
-          return;
-        }
-        if (!message.trim()) {
-          this._showToast("Please enter a message", true);
-          return;
-        }
-        
-        const success = await this._sendMessage(contactId, message);
-        if (success) {
-          this.shadowRoot.querySelector("#send-message").value = "";
-        }
-      });
-    }
   }
 }
 
