@@ -2,14 +2,23 @@
   name: Send Message
   description: Send an SMS, MMS, or voice message to a contact.
   fields:
+    use_trigger_contact:
+      name: Reply to Sender
+      description: "Enable to reply to whoever triggered the automation. ⚠️ After enabling, switch to YAML mode and add: contact_id: \"sensor.textnow_{{ trigger.contact_id }}\""
+      required: false
+      default: false
+      selector:
+        boolean:
     contact_id:
       name: Contact
-      description: "Enter contact entity (e.g., sensor.textnow_brandon) OR leave empty to auto-reply to the trigger sender. When empty, uses: sensor.textnow_{{ trigger.contact_id }}"
+      description: "Select a specific contact, or when 'Reply to Sender' is enabled, use YAML template: sensor.textnow_{{ trigger.contact_id }}"
       required: false
-      default: ""
       example: "sensor.textnow_brandon"
       selector:
-        text:
+        entity:
+          domain: sensor
+          filter:
+            - integration: textnow
     message:
       name: Message
       description: Message text to send (required for SMS, optional caption for MMS).
@@ -35,14 +44,23 @@ send_menu:
   name: Send Menu
   description: Send an interactive menu with numbered options and wait for the user's response. Use with response_variable to capture the reply for use with choose action.
   fields:
+    use_trigger_contact:
+      name: Reply to Sender
+      description: "Enable to reply to whoever triggered the automation. ⚠️ After enabling, switch to YAML mode and add: contact_id: \"sensor.textnow_{{ trigger.contact_id }}\""
+      required: false
+      default: false
+      selector:
+        boolean:
     contact_id:
       name: Contact
-      description: "Enter contact entity (e.g., sensor.textnow_brandon) OR leave empty to auto-reply to the trigger sender. When empty, uses: sensor.textnow_{{ trigger.contact_id }}"
+      description: "Select a specific contact, or when 'Reply to Sender' is enabled, use YAML template: sensor.textnow_{{ trigger.contact_id }}"
       required: false
-      default: ""
       example: "sensor.textnow_brandon"
       selector:
-        text:
+        entity:
+          domain: sensor
+          filter:
+            - integration: textnow
     options:
       name: Menu Options
       description: Enter one option per line. Users reply with the option number (1, 2, 3, etc.) to select.
