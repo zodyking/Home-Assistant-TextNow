@@ -39,3 +39,4 @@ venv/
 # HACS
 .hacs.json
 
+community.md
