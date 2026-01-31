@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import storage
+from homeassistant.components import frontend, panel_custom
+from homeassistant.components.http import StaticPathConfig
 
 from .const import DOMAIN
 from .coordinator import TextNowDataUpdateCoordinator
@@ -15,6 +18,11 @@ from .coordinator import TextNowDataUpdateCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+# Panel configuration
+PANEL_URL = "/api/panel_custom/textnow"
+PANEL_ICON = "mdi:message-text"
+PANEL_TITLE = "TextNow"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -35,7 +43,40 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .websocket import async_setup as async_setup_websocket
     async_setup_websocket(hass)
 
+    # Register sidebar panel (only once)
+    await async_register_panel(hass)
+
     return True
+
+
+async def async_register_panel(hass: HomeAssistant) -> None:
+    """Register the TextNow sidebar panel."""
+    # Check if panel is already registered
+    if DOMAIN in hass.data.get("frontend_panels", {}):
+        return
+
+    # Get the path to our panel JS file
+    panel_path = os.path.join(os.path.dirname(__file__), "frontend")
+    panel_url = f"/textnow_panel"
+
+    # Register static path for the panel files
+    await hass.http.async_register_static_paths([
+        StaticPathConfig(panel_url, panel_path, cache_headers=False)
+    ])
+
+    # Register the custom panel
+    await panel_custom.async_register_panel(
+        hass,
+        webcomponent_name="textnow-panel",
+        frontend_url_path=DOMAIN,
+        sidebar_title=PANEL_TITLE,
+        sidebar_icon=PANEL_ICON,
+        module_url=f"{panel_url}/textnow-panel.js",
+        embed_iframe=False,
+        require_admin=False,
+    )
+    
+    _LOGGER.info("TextNow panel registered")
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

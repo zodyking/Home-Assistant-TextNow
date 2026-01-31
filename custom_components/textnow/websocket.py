@@ -19,11 +19,33 @@ _LOGGER = logging.getLogger(__name__)
 @callback
 def async_setup(hass: HomeAssistant) -> None:
     """Set up WebSocket API."""
+    websocket_api.async_register_command(hass, websocket_get_entries)
     websocket_api.async_register_command(hass, websocket_contacts_list)
     websocket_api.async_register_command(hass, websocket_contacts_add)
     websocket_api.async_register_command(hass, websocket_contacts_update)
     websocket_api.async_register_command(hass, websocket_contacts_delete)
     websocket_api.async_register_command(hass, websocket_send_test)
+
+
+@websocket_api.websocket_command(
+    {
+        "type": "textnow/get_entries",
+    }
+)
+@websocket_api.async_response
+async def websocket_get_entries(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Get all TextNow config entries."""
+    entries = hass.config_entries.async_entries(DOMAIN)
+    result = [
+        {
+            "entry_id": entry.entry_id,
+            "title": entry.title,
+        }
+        for entry in entries
+    ]
+    connection.send_result(msg["id"], result)
 
 
 @websocket_api.websocket_command(
