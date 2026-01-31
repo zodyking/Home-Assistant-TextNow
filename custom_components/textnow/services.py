@@ -33,8 +33,9 @@ _LOGGER = logging.getLogger(__name__)
 SERVICE_SEND_SCHEMA = vol.Schema(
     {
         vol.Optional("message", default=""): str,
-        vol.Exclusive("phone", "recipient"): str,
-        vol.Exclusive("contact_id", "recipient"): str,
+        vol.Optional("contact_id"): str,  # Entity selector dropdown
+        vol.Optional("contact_from_trigger"): str,  # Template field for trigger variable
+        vol.Optional("phone"): str,  # Direct phone number (legacy)
         vol.Optional("mms_image"): str,  # File path from file selector
         vol.Optional("voice_audio"): str,  # File path from file selector
     }
@@ -42,7 +43,8 @@ SERVICE_SEND_SCHEMA = vol.Schema(
 
 SERVICE_SEND_MENU_SCHEMA = vol.Schema(
     {
-        vol.Required("contact_id"): str,
+        vol.Optional("contact_id"): str,  # Entity selector dropdown
+        vol.Optional("contact_from_trigger"): str,  # Template field for trigger variable
         vol.Required("options"): str,  # Multiline text, one option per line
         vol.Optional("include_header", default=True): bool,
         vol.Optional("header", default=DEFAULT_MENU_HEADER): str,
@@ -307,10 +309,29 @@ def _resolve_file_path(hass: HomeAssistant, file_path: str) -> str | None:
 async def _resolve_phone_from_contact(
     hass: HomeAssistant, coordinator: TextNowDataUpdateCoordinator, data: dict[str, Any]
 ) -> str | None:
-    """Resolve phone number from contact_id (entity_id or contact_id)."""
-    contact_id = data.get("contact_id")
+    """Resolve phone number from contact_id or contact_from_trigger.
+    
+    Priority:
+    1. contact_from_trigger (template field for trigger variables)
+    2. contact_id (entity selector dropdown)
+    3. phone (direct phone number - legacy)
+    """
+    # Check contact_from_trigger first (template field)
+    contact_id = data.get("contact_from_trigger")
+    
+    # If contact_from_trigger is empty or not provided, fall back to contact_id
+    if not contact_id or not contact_id.strip():
+        contact_id = data.get("contact_id")
+    
+    # If still nothing, check for direct phone number
+    if not contact_id or not contact_id.strip():
+        phone = data.get("phone")
+        if phone:
+            _LOGGER.debug("Using direct phone number: %s", phone)
+            return phone
+    
     if not contact_id:
-        _LOGGER.error("No contact_id provided in service call")
+        _LOGGER.error("No contact_id, contact_from_trigger, or phone provided in service call")
         return None
 
     _LOGGER.debug("Resolving phone for contact_id: %s", contact_id)

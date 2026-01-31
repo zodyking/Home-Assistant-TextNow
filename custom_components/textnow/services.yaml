@@ -4,14 +4,21 @@
   fields:
     contact_id:
       name: Contact
-      description: Select a contact to send message to.
-      required: true
+      description: Select a contact from the dropdown.
+      required: false
       example: "sensor.textnow_contact_1"
       selector:
         entity:
           domain: sensor
           filter:
             - integration: textnow
+    contact_from_trigger:
+      name: Contact from Trigger
+      description: "Use contact from trigger variable. Enter: {{ trigger.contact_id }} to reply to whoever sent the message."
+      required: false
+      example: "{{ trigger.contact_id }}"
+      selector:
+        text:
     message:
       name: Message
       description: Message text to send (required for SMS, optional caption for MMS).
@@ -39,9 +46,19 @@ send_menu:
   fields:
     contact_id:
       name: Contact
-      description: "Contact entity ID or template. Use {{ trigger.contact_id }} to reply to whoever triggered the automation."
-      required: true
-      example: "sensor.textnow_{{ trigger.contact_id }}"
+      description: Select a contact from the dropdown.
+      required: false
+      example: "sensor.textnow_john"
+      selector:
+        entity:
+          domain: sensor
+          filter:
+            - integration: textnow
+    contact_from_trigger:
+      name: Contact from Trigger
+      description: "Use contact from trigger variable. Enter: {{ trigger.contact_id }} to reply to whoever sent the message."
+      required: false
+      example: "{{ trigger.contact_id }}"
       selector:
         text:
     options:
