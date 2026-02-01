@@ -1,6 +1,7 @@
 """The TextNow integration."""
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -86,19 +87,27 @@ async def async_register_panel(hass: HomeAssistant) -> None:
     panel_path = os.path.join(os.path.dirname(__file__), "frontend")
     panel_url = f"/textnow_panel"
 
+    # Version from manifest for cache busting so updated panel loads after HACS update
+    manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
+    try:
+        with open(manifest_path, encoding="utf-8") as f:
+            version = json.load(f).get("version", "1.0.0")
+    except (OSError, json.JSONDecodeError):
+        version = "1.0.0"
+
     # Register static path for the panel files
     await hass.http.async_register_static_paths([
         StaticPathConfig(panel_url, panel_path, cache_headers=False)
     ])
 
-    # Register the custom panel
+    # Register the custom panel (version in URL forces browser to load new JS after update)
     await panel_custom.async_register_panel(
         hass,
         webcomponent_name="textnow-panel",
         frontend_url_path=DOMAIN,
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        module_url=f"{panel_url}/textnow-panel.js",
+        module_url=f"{panel_url}/textnow-panel.js?v={version}",
         embed_iframe=False,
         require_admin=False,
     )
