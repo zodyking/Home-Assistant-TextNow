@@ -8,7 +8,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import storage
+from homeassistant.helpers import storage, device_registry as dr
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 
@@ -33,6 +33,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    # Register the TextNow device explicitly so device triggers work reliably
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=f"TextNow ({entry.title})",
+        manufacturer="TextNow",
+        model="SMS Integration",
+        entry_type=dr.DeviceEntryType.SERVICE,
+    )
+    _LOGGER.debug("Registered TextNow device for entry %s", entry.entry_id)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

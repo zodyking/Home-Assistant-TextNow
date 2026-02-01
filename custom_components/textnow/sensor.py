@@ -97,13 +97,16 @@ class TextNowContactSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device info for this sensor."""
+        """Return device info for this sensor.
+        
+        Uses the same identifiers as registered in __init__.py
+        so all sensors attach to the same device.
+        """
         return DeviceInfo(
             identifiers={(DOMAIN, self._entry_id)},
-            name="TextNow",
+            name=f"TextNow ({self.coordinator.entry.title})",
             manufacturer="TextNow",
             model="SMS Integration",
-            entry_type="service",
         )
 
     @property
