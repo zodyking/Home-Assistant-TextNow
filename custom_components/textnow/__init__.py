@@ -29,34 +29,49 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up TextNow from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    coordinator = TextNowDataUpdateCoordinator(hass, entry)
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        coordinator = TextNowDataUpdateCoordinator(hass, entry)
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as err:
+        _LOGGER.error("Failed to initialize TextNow coordinator: %s", err)
+        raise
 
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     # Register the TextNow device explicitly so device triggers work reliably
-    device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=f"TextNow ({entry.title})",
-        manufacturer="TextNow",
-        model="SMS Integration",
-        entry_type=dr.DeviceEntryType.SERVICE,
-    )
-    _LOGGER.debug("Registered TextNow device for entry %s", entry.entry_id)
+    try:
+        device_registry = dr.async_get(hass)
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"TextNow ({entry.title})",
+            manufacturer="TextNow",
+            model="SMS Integration",
+        )
+        _LOGGER.info("Registered TextNow device for entry %s", entry.entry_id)
+    except Exception as err:
+        _LOGGER.error("Failed to register TextNow device: %s", err)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register services
-    await async_setup_services(hass, coordinator)
+    try:
+        await async_setup_services(hass, coordinator)
+    except Exception as err:
+        _LOGGER.error("Failed to register TextNow services: %s", err)
 
     # Register WebSocket API
-    from .websocket import async_setup as async_setup_websocket
-    async_setup_websocket(hass)
+    try:
+        from .websocket import async_setup as async_setup_websocket
+        async_setup_websocket(hass)
+    except Exception as err:
+        _LOGGER.error("Failed to register TextNow WebSocket API: %s", err)
 
     # Register sidebar panel (only once)
-    await async_register_panel(hass)
+    try:
+        await async_register_panel(hass)
+    except Exception as err:
+        _LOGGER.error("Failed to register TextNow panel: %s", err)
 
     return True
 
