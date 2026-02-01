@@ -144,7 +144,7 @@ class TextNowPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
-    this._mediaQuery = window.matchMedia("(max-width: 1024px)");
+    this._mediaQuery = window.matchMedia("(max-width: 870px)");
     this._mediaQueryListener = () => {
       const narrow = this._mediaQuery.matches;
       if (this._narrow !== narrow) {
@@ -186,7 +186,7 @@ class TextNowPanel extends HTMLElement {
         }
         
         .header {
-          background: linear-gradient(135deg, var(--textnow-primary-light), var(--textnow-primary));
+          background: var(--app-header-background-color, var(--sidebar-background-color, #1e1e1e));
           padding: 16px 24px;
           display: flex;
           align-items: center;
@@ -218,6 +218,7 @@ class TextNowPanel extends HTMLElement {
           display: flex;
           align-items: center;
           gap: 8px;
+          margin-left: auto;
         }
         
         .btn-menu {
@@ -227,15 +228,15 @@ class TextNowPanel extends HTMLElement {
           height: 40px;
           border: none;
           border-radius: 4px;
-          background: rgba(255,255,255,0.2);
-          color: white;
+          background: var(--secondary-background-color, #2a2a2a);
+          color: var(--primary-text-color, #fff);
           cursor: pointer;
           align-items: center;
           justify-content: center;
           transition: background 0.2s;
         }
         .btn-menu:hover {
-          background: rgba(255,255,255,0.3);
+          background: var(--divider-color, #333);
         }
         .narrow .btn-menu {
           display: inline-flex;
