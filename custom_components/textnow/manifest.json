@@ -9,6 +9,6 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/zodyking/Home-Assistant-TextNow/issues",
   "requirements": [],
-  "version": "1.1.2"
+  "version": "1.1.3"
 }
 

@@ -144,24 +144,24 @@ class TextNowPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
-    this._mediaQuery = window.matchMedia("(max-width: 870px)");
-    this._mediaQueryListener = () => {
-      const narrow = this._mediaQuery.matches;
+    const NARROW_MAX = 870;
+    const checkNarrow = () => {
+      const w = this.offsetWidth || this.getBoundingClientRect().width;
+      const narrow = w <= NARROW_MAX;
       if (this._narrow !== narrow) {
         this._narrow = narrow;
         this._render();
       }
     };
-    this._mediaQuery.addEventListener("change", this._mediaQueryListener);
-    if (this._narrow !== this._mediaQuery.matches) {
-      this._narrow = this._mediaQuery.matches;
-      this._render();
-    }
+    this._resizeObserver = new ResizeObserver(() => checkNarrow());
+    this._resizeObserver.observe(this);
+    requestAnimationFrame(checkNarrow);
   }
 
   disconnectedCallback() {
-    if (this._mediaQuery && this._mediaQueryListener) {
-      this._mediaQuery.removeEventListener("change", this._mediaQueryListener);
+    if (this._resizeObserver) {
+      this._resizeObserver.disconnect();
+      this._resizeObserver = null;
     }
   }
 
@@ -186,7 +186,7 @@ class TextNowPanel extends HTMLElement {
         }
         
         .header {
-          background: var(--app-header-background-color, var(--sidebar-background-color, #1e1e1e));
+          background: var(--sidebar-background-color, #252525);
           padding: 16px 24px;
           display: flex;
           align-items: center;
