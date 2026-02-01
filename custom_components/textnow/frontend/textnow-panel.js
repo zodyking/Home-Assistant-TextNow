@@ -13,6 +13,7 @@ class TextNowPanel extends HTMLElement {
     this._contactsByEntry = {};  // Contacts grouped by entry_id
     this._activeTab = "contacts";
     this._loading = false;
+    this._narrow = false;
   }
 
   set hass(hass) {
@@ -24,6 +25,12 @@ class TextNowPanel extends HTMLElement {
 
   set panel(panel) {
     this._config = panel.config;
+  }
+
+  set narrow(value) {
+    const prev = this._narrow;
+    this._narrow = !!value;
+    if (prev !== this._narrow) this._render();
   }
 
   async _loadEntries() {
@@ -137,12 +144,34 @@ class TextNowPanel extends HTMLElement {
 
   connectedCallback() {
     this._render();
+    this._mediaQuery = window.matchMedia("(max-width: 1024px)");
+    this._mediaQueryListener = () => {
+      const narrow = this._mediaQuery.matches;
+      if (this._narrow !== narrow) {
+        this._narrow = narrow;
+        this._render();
+      }
+    };
+    this._mediaQuery.addEventListener("change", this._mediaQueryListener);
+    if (this._narrow !== this._mediaQuery.matches) {
+      this._narrow = this._mediaQuery.matches;
+      this._render();
+    }
+  }
+
+  disconnectedCallback() {
+    if (this._mediaQuery && this._mediaQueryListener) {
+      this._mediaQuery.removeEventListener("change", this._mediaQueryListener);
+    }
   }
 
   _render() {
     const styles = `
       <style>
         :host {
+          --textnow-primary: #6A2EAA;
+          --textnow-primary-light: #8B3CBF;
+          --textnow-primary-dark: #5A2490;
           display: block;
           height: 100%;
           background: var(--primary-background-color, #1c1c1c);
@@ -157,7 +186,7 @@ class TextNowPanel extends HTMLElement {
         }
         
         .header {
-          background: var(--primary-color, #03a9f4);
+          background: linear-gradient(135deg, var(--textnow-primary-light), var(--textnow-primary));
           padding: 16px 24px;
           display: flex;
           align-items: center;
@@ -172,6 +201,13 @@ class TextNowPanel extends HTMLElement {
           flex: 1;
         }
         
+        .header-logo {
+          width: 32px;
+          height: 32px;
+          object-fit: contain;
+          flex-shrink: 0;
+        }
+        
         .header-icon {
           width: 32px;
           height: 32px;
@@ -180,7 +216,29 @@ class TextNowPanel extends HTMLElement {
         
         .header-actions {
           display: flex;
+          align-items: center;
           gap: 8px;
+        }
+        
+        .btn-menu {
+          display: none;
+          padding: 8px;
+          min-width: 40px;
+          height: 40px;
+          border: none;
+          border-radius: 4px;
+          background: rgba(255,255,255,0.2);
+          color: white;
+          cursor: pointer;
+          align-items: center;
+          justify-content: center;
+          transition: background 0.2s;
+        }
+        .btn-menu:hover {
+          background: rgba(255,255,255,0.3);
+        }
+        .narrow .btn-menu {
+          display: inline-flex;
         }
         
         .tabs {
@@ -208,8 +266,8 @@ class TextNowPanel extends HTMLElement {
         }
         
         .tab.active {
-          color: var(--primary-color, #03a9f4);
-          border-bottom-color: var(--primary-color, #03a9f4);
+          color: var(--textnow-primary-light);
+          border-bottom-color: var(--textnow-primary);
         }
         
         .content {
@@ -248,7 +306,7 @@ class TextNowPanel extends HTMLElement {
           align-items: center;
           gap: 12px;
           padding: 12px 16px;
-          background: linear-gradient(135deg, var(--primary-color, #03a9f4), #0288d1);
+          background: linear-gradient(135deg, var(--textnow-primary-light), var(--textnow-primary));
           border-radius: 8px 8px 0 0;
           color: white;
         }
@@ -297,14 +355,14 @@ class TextNowPanel extends HTMLElement {
         }
         
         .contact-item:hover {
-          background: rgba(3, 169, 244, 0.1);
+          background: rgba(106, 46, 170, 0.15);
         }
         
         .contact-avatar {
           width: 40px;
           height: 40px;
           border-radius: 50%;
-          background: var(--primary-color, #03a9f4);
+          background: var(--textnow-primary);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -348,12 +406,13 @@ class TextNowPanel extends HTMLElement {
         }
         
         .btn-primary {
-          background: var(--primary-color, #03a9f4);
+          background: var(--textnow-primary);
           color: white;
         }
         
         .btn-primary:hover {
-          filter: brightness(1.1);
+          background: var(--textnow-primary-light);
+          filter: brightness(1.05);
         }
         
         .btn-secondary {
@@ -381,13 +440,14 @@ class TextNowPanel extends HTMLElement {
         }
         
         .btn-add-account {
-          background: linear-gradient(135deg, #4caf50, #388e3c);
+          background: var(--textnow-primary);
           color: white;
           padding: 10px 20px;
         }
         
         .btn-add-account:hover {
-          filter: brightness(1.1);
+          background: var(--textnow-primary-light);
+          filter: brightness(1.05);
         }
         
         .form-group {
@@ -414,7 +474,7 @@ class TextNowPanel extends HTMLElement {
         
         .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
           outline: none;
-          border-color: var(--primary-color, #03a9f4);
+          border-color: var(--textnow-primary);
         }
         
         .form-row {
@@ -449,7 +509,7 @@ class TextNowPanel extends HTMLElement {
           width: 40px;
           height: 40px;
           border: 3px solid var(--divider-color, #333);
-          border-top-color: var(--primary-color, #03a9f4);
+          border-top-color: var(--textnow-primary);
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
@@ -519,7 +579,7 @@ class TextNowPanel extends HTMLElement {
           height: 80px;
           margin-bottom: 24px;
           opacity: 0.6;
-          fill: var(--primary-color, #03a9f4);
+          fill: var(--textnow-primary);
         }
         
         .no-accounts h2 {
@@ -554,10 +614,12 @@ class TextNowPanel extends HTMLElement {
 
     const header = `
       <div class="header">
-        <svg class="header-icon" viewBox="0 0 24 24">
-          <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
-        </svg>
-        <h1>TextNow</h1>
+        <button class="btn btn-menu" id="menu-btn" title="Open menu" aria-label="Open menu">
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+        </button>
+        <img class="header-logo" src="/textnow_panel/textnow-logo.png" alt="">
         <div class="header-actions">
           <button class="btn btn-add-account" id="add-account-btn" title="Add TextNow Account">
             <svg width="18" height="18" viewBox="0 0 24 24">
@@ -590,9 +652,10 @@ class TextNowPanel extends HTMLElement {
       content = this._renderStatusTab();
     }
 
+    const containerClass = this._narrow ? "container narrow" : "container";
     this.shadowRoot.innerHTML = `
       ${styles}
-      <div class="container">
+      <div class="${containerClass}">
         ${header}
         ${tabs}
         <div class="content">
@@ -748,7 +811,16 @@ class TextNowPanel extends HTMLElement {
     return statusHtml;
   }
 
+  _openSidebar() {
+    this.dispatchEvent(new CustomEvent("hass-toggle-menu", { bubbles: true, composed: true }));
+  }
+
   _attachEventListeners() {
+    const menuBtn = this.shadowRoot.querySelector("#menu-btn");
+    if (menuBtn) {
+      menuBtn.addEventListener("click", () => this._openSidebar());
+    }
+
     // Tab switching
     this.shadowRoot.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", (e) => {
